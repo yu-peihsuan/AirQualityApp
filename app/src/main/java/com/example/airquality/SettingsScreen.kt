@@ -26,62 +26,68 @@ fun SettingsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgWarm)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
+            .background(BgMain)
     ) {
-        Spacer(Modifier.height(16.dp))
-        Text("設定", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
-        Spacer(Modifier.height(24.dp))
+        // ── Header ──────────────────────────────────────────────────────────
+        AppHeader(title = "設定")
 
-        // ── 帳號管理 ───────────────────────────────────────
-        SettingSection("帳號管理") {
-            SettingInfoRow("個人帳號",   "abc123@gmail.com")
-            HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
-            SettingInfoRow("使用者名稱", "abc123")
+        // ── 主內容 (scrollable) ─────────────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+        ) {
+            Spacer(Modifier.height(24.dp))
+
+            // ── 帳號管理 ───────────────────────────────────────
+            SettingSection("帳號管理") {
+                SettingInfoRow("個人帳號",   "abc123@gmail.com")
+                HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
+                SettingInfoRow("使用者名稱", "abc123")
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // ── 健康敏感度 ─────────────────────────────────────
+            SettingSection("健康敏感度") {
+                Text(
+                    "AI 於你的偏好自動優化風險通知",
+                    color = TextGray, fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+                HealthCheckRow("氣喘",   isAsthma)   { isAsthma   = it }
+                HealthCheckRow("心臟病", isHeart)    { isHeart    = it }
+                HealthCheckRow("懷孕中", isPregnant) { isPregnant = it }
+                HealthCheckRow("過敏",   isAllergy)  { isAllergy  = it }
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = otherText,
+                    onValueChange = { otherText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    placeholder = { Text("其他（請說明）", color = TextGray, fontSize = 13.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = BgMain,
+                        focusedContainerColor   = BgMain,
+                        unfocusedBorderColor    = DividerColor,
+                        focusedBorderColor      = OrangeMain,
+                    ),
+                    singleLine = true
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // ── 連結列 ────────────────────────────────────────
+            SettingSection(title = null) {
+                SettingLinkRow("我的通報配置")
+                HorizontalDivider(color = DividerColor)
+                SettingLinkRow("通知設定")
+            }
+
+            Spacer(Modifier.height(32.dp))
         }
-
-        Spacer(Modifier.height(20.dp))
-
-        // ── 健康敏感度 ─────────────────────────────────────
-        SettingSection("健康敏感度") {
-            Text(
-                "AI 於你的偏好自動優化風險通知",
-                color = TextGray, fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
-            HealthCheckRow("氣喘",   isAsthma)   { isAsthma   = it }
-            HealthCheckRow("心臟病", isHeart)    { isHeart    = it }
-            HealthCheckRow("懷孕中", isPregnant) { isPregnant = it }
-            HealthCheckRow("過敏",   isAllergy)  { isAllergy  = it }
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = otherText,
-                onValueChange = { otherText = it },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                placeholder = { Text("其他（請說明）", color = TextGray, fontSize = 13.sp) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = BgWarm,
-                    focusedContainerColor   = BgWarm,
-                    unfocusedBorderColor    = DividerColor,
-                    focusedBorderColor      = OrangeMain,
-                ),
-                singleLine = true
-            )
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // ── 連結列 ────────────────────────────────────────
-        SettingSection(title = null) {
-            SettingLinkRow("我的通報配置")
-            HorizontalDivider(color = DividerColor)
-            SettingLinkRow("通知設定")
-        }
-
-        Spacer(Modifier.height(32.dp))
     }
 }
 

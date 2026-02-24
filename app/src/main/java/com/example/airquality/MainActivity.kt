@@ -47,12 +47,12 @@ fun MainScreen() {
     )
 
     androidx.compose.material3.Scaffold(
-        containerColor = BgWarm,
+        containerColor = BgMain,
         bottomBar = {
             AppBottomBar(navItems, selectedTab) { selectedTab = it }
         }
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
+        Box(Modifier.padding(bottom = padding.calculateBottomPadding()).fillMaxSize()) {
             when (selectedTab) {
                 0 -> HomeScreen()
                 1 -> NotificationScreen()
@@ -102,7 +102,7 @@ fun AppBottomBar(
                         Text(item.emoji, fontSize = 20.sp)
                         Text(
                             item.label,
-                            color = if (selectedIndex == index) OrangeMain else TextGray,
+                            color = if (selectedIndex == index) NavSelected else NavUnselected,
                             fontSize = 10.sp,
                             fontWeight = if (selectedIndex == index) FontWeight.SemiBold else FontWeight.Normal,
                             textAlign = TextAlign.Center

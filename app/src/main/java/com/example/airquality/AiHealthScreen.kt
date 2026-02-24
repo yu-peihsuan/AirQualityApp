@@ -38,16 +38,13 @@ fun AiHealthScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgWarm)
-            .statusBarsPadding()
+            .background(BgMain)
     ) {
-        // ── 標題 ─────────────────────────────────────────
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            Text("AI 健康顧問", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
-            Text("根據您的健康狀況與空氣品質提供建議", color = TextGray, fontSize = 12.sp)
-        }
-
-        HorizontalDivider(color = DividerColor)
+        // ── Header ──────────────────────────────────────────────────────────
+        AppHeader(
+            title = "AI 健康顧問",
+            subtitle = "根據您的健康狀況與空氣品質提供建議"
+        )
 
         // ── 訊息列表 ─────────────────────────────────────
         Column(
@@ -79,8 +76,8 @@ fun AiHealthScreen() {
                     shape = RoundedCornerShape(24.dp),
                     placeholder = { Text("輸入您的問題…", color = TextGray) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = BgWarm,
-                        focusedContainerColor   = BgWarm,
+                        unfocusedContainerColor = BgMain,
+                        focusedContainerColor   = BgMain,
                         unfocusedBorderColor    = DividerColor,
                         focusedBorderColor      = OrangeMain,
                     ),
@@ -100,8 +97,7 @@ fun AiHealthScreen() {
                         "➤",
                         color = White,
                         fontSize = 20.sp,
-                        modifier = Modifier
-                            .padding(2.dp)
+                        modifier = Modifier.padding(2.dp)
                     )
                 }
             }

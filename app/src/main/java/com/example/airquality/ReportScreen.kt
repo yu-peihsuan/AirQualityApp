@@ -25,45 +25,80 @@ fun ReportScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgWarm)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp)
+            .background(BgMain)
     ) {
-        Spacer(Modifier.height(8.dp))
-        Text("事件通報", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
-        Spacer(Modifier.height(24.dp))
-
-        // ── 位置 ──────────────────────────────────────────
-        SectionLabel("位置")
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = location,
-            onValueChange = { location = it },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = CardWhite,
-                focusedContainerColor   = CardWhite,
-                unfocusedBorderColor    = DividerColor,
-                focusedBorderColor      = OrangeMain,
-            ),
-            singleLine = true
+        // ── Header ──────────────────────────────────────────────────────────
+        AppHeader(
+            title = "事件通報"
         )
 
-        Spacer(Modifier.height(16.dp))
+        // ── 主內容 (scrollable) ─────────────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
+        ) {
+            Spacer(Modifier.height(8.dp))
 
-        // ── 事件類別下拉 ──────────────────────────────────
-        SectionLabel("事件類別")
-        Spacer(Modifier.height(6.dp))
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+            // ── 位置 ──────────────────────────────────────────
+            SectionLabel("位置")
+            Spacer(Modifier.height(6.dp))
             OutlinedTextField(
-                value = category.ifEmpty { "請選擇事件類別" },
-                onValueChange = {},
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                value = location,
+                onValueChange = { location = it },
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = CardWhite,
+                    focusedContainerColor   = CardWhite,
+                    unfocusedBorderColor    = DividerColor,
+                    focusedBorderColor      = OrangeMain,
+                ),
+                singleLine = true
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── 事件類別下拉 ──────────────────────────────────
+            SectionLabel("事件類別")
+            Spacer(Modifier.height(6.dp))
+            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                OutlinedTextField(
+                    value = category.ifEmpty { "請選擇事件類別" },
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = CardWhite,
+                        focusedContainerColor   = CardWhite,
+                        unfocusedBorderColor    = DividerColor,
+                        focusedBorderColor      = OrangeMain,
+                    )
+                )
+                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    categories.forEach { item ->
+                        DropdownMenuItem(
+                            text = { Text(item) },
+                            onClick = { category = item; expanded = false }
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── 簡易描述 ──────────────────────────────────────
+            SectionLabel("簡易描述")
+            Spacer(Modifier.height(6.dp))
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                shape = RoundedCornerShape(12.dp),
+                placeholder = { Text("請描述您觀察到的空氣品質問題…", color = TextGray) },
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedContainerColor = CardWhite,
                     focusedContainerColor   = CardWhite,
@@ -71,54 +106,27 @@ fun ReportScreen() {
                     focusedBorderColor      = OrangeMain,
                 )
             )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                categories.forEach { item ->
-                    DropdownMenuItem(
-                        text = { Text(item) },
-                        onClick = { category = item; expanded = false }
-                    )
+
+            Spacer(Modifier.height(32.dp))
+
+            // ── 按鈕列 ────────────────────────────────────────
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = {},
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("取消", color = TextMid) }
+
+                Button(
+                    onClick = {},
+                    modifier = Modifier.weight(2f).height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = TextDark)
+                ) {
+                    Text("📤", fontSize = 16.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text("立即通報", fontWeight = FontWeight.SemiBold)
                 }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // ── 簡易描述 ──────────────────────────────────────
-        SectionLabel("簡易描述")
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = description,
-            onValueChange = { description = it },
-            modifier = Modifier.fillMaxWidth().height(120.dp),
-            shape = RoundedCornerShape(12.dp),
-            placeholder = { Text("請描述您觀察到的空氣品質問題…", color = TextGray) },
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = CardWhite,
-                focusedContainerColor   = CardWhite,
-                unfocusedBorderColor    = DividerColor,
-                focusedBorderColor      = OrangeMain,
-            )
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        // ── 按鈕列 ────────────────────────────────────────
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(
-                onClick = {},
-                modifier = Modifier.weight(1f).height(50.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text("取消", color = TextMid) }
-
-            Button(
-                onClick = {},
-                modifier = Modifier.weight(2f).height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = TextDark)
-            ) {
-                Text("📤", fontSize = 16.sp)
-                Spacer(Modifier.width(6.dp))
-                Text("立即通報", fontWeight = FontWeight.SemiBold)
             }
         }
     }

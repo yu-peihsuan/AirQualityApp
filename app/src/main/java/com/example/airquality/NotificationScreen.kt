@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,56 +22,62 @@ fun NotificationScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgWarm)
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
+            .background(BgMain)
     ) {
-        Spacer(Modifier.height(16.dp))
-        Text("通知中心", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextDark)
-        Spacer(Modifier.height(20.dp))
+        // ── Header ──────────────────────────────────────────────────────────
+        AppHeader(title = "通知中心")
 
-        NotifyCard(
-            emoji    = "⚠️",
-            emojiBg  = RedCard,
-            tag      = "緊急警報",
-            tagColor = RedText,
-            time     = "1分鐘前",
-            title    = "數值異常飆升",
-            body     = "中正區 PM2.5 濃度急速上升，建議立即撤離。",
-            cardBg   = RedCard
-        )
+        // ── 主內容 (scrollable) ─────────────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+        ) {
+            Spacer(Modifier.height(20.dp))
 
-        Spacer(Modifier.height(12.dp))
+            NotifyCard(
+                emoji    = "⚠️",
+                emojiBg  = RedCard,
+                tag      = "緊急警報",
+                tagColor = RedText,
+                time     = "1分鐘前",
+                title    = "數值異常飆升",
+                body     = "中正區 PM2.5 濃度急速上升，建議立即撤離。",
+                cardBg   = RedCard
+            )
 
-        NotifyCard(
-            emoji    = "🔥",
-            emojiBg  = OrangeLight,
-            tag      = "民眾回報",
-            tagColor = OrangeMain,
-            time     = "30分鐘前",
-            title    = "火災事件",
-            body     = "附近近來火災，沾染煙霧來源，很濃。",
-            cardBg   = CardWhite
-        )
+            Spacer(Modifier.height(12.dp))
 
-        Spacer(Modifier.height(24.dp))
+            NotifyCard(
+                emoji    = "🔥",
+                emojiBg  = OrangeLight,
+                tag      = "民眾回報",
+                tagColor = OrangeMain,
+                time     = "30分鐘前",
+                title    = "火災事件",
+                body     = "附近近來火災，沾染煙霧來源，很濃。",
+                cardBg   = CardWhite
+            )
 
-        Text("歷史紀錄", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextMid)
-        Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(24.dp))
 
-        NotifyCard(
-            emoji    = "✅",
-            emojiBg  = GreenCard,
-            tag      = "空氣品質轉好",
-            tagColor = GreenText,
-            time     = "昨日",
-            title    = "空氣品質轉好",
-            body     = "昨日天氣擴散條件改善，可以關窗通風了。",
-            cardBg   = GreenCard
-        )
+            Text("歷史紀錄", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextMid)
+            Spacer(Modifier.height(12.dp))
 
-        Spacer(Modifier.height(32.dp))
+            NotifyCard(
+                emoji    = "✅",
+                emojiBg  = GreenCard,
+                tag      = "空氣品質轉好",
+                tagColor = GreenText,
+                time     = "昨日",
+                title    = "空氣品質轉好",
+                body     = "昨日天氣擴散條件改善，可以關窗通風了。",
+                cardBg   = GreenCard
+            )
+
+            Spacer(Modifier.height(32.dp))
+        }
     }
 }
 
