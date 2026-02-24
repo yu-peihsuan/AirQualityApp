@@ -91,13 +91,25 @@ fun HomeAppHeader(
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("📍", fontSize = 18.sp) // Location Pin size
-                    Spacer(Modifier.width(4.dp))
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.location),
+                        contentDescription = "Location",
+                        modifier = Modifier.size(20.dp),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(HeaderText)
+                    )
+                    Spacer(Modifier.width(6.dp))
                     Text(location, fontSize = 20.sp, fontWeight = FontWeight.Medium, color = HeaderText) // Location text size
                 }
-                Text(date, color = TextGray, fontSize = 16.sp, modifier = Modifier.padding(start = 24.dp)) // 再把日期的字體調大一點
+                Text(date, color = TextGray, fontSize = 16.sp, modifier = Modifier.padding(start = 26.dp)) // 再把日期的字體調大一點
             }
-            Text("🔔", fontSize = 24.sp, modifier = Modifier.clickable { onBellClick() }) // Bell icon size
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = R.drawable.bell),
+                contentDescription = "Bell",
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { onBellClick() },
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(HeaderText)
+            )
         }
 
         HorizontalDivider(color = HeaderBorder, thickness = 1.dp)

@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.airquality.ui.theme.*
 
-data class NavItem(val label: String, val emoji: String)
+data class NavItem(val label: String, val iconRes: Int?, val emoji: String? = null)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,11 +39,11 @@ fun MainScreen() {
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val navItems = listOf(
-        NavItem("首頁",   "🏠"),
-        NavItem("通知",   "🔔"),
-        NavItem("通報",   "＋"),
-        NavItem("AI顧問", "🤖"),
-        NavItem("設定",   "👤"),
+        NavItem("首頁",   R.drawable.home),
+        NavItem("AI顧問", R.drawable.chat_bot),
+        NavItem("通報",   R.drawable.broadcast),
+        NavItem("通知",   R.drawable.alarm),
+        NavItem("設定",   R.drawable.user),
     )
 
     androidx.compose.material3.Scaffold(
@@ -55,9 +55,9 @@ fun MainScreen() {
         Box(Modifier.padding(bottom = padding.calculateBottomPadding()).fillMaxSize()) {
             when (selectedTab) {
                 0 -> HomeScreen()
-                1 -> NotificationScreen()
+                1 -> AiHealthScreen()
                 2 -> ReportScreen()
-                3 -> AiHealthScreen()
+                3 -> NotificationScreen()
                 4 -> SettingsScreen()
             }
         }
@@ -90,16 +90,35 @@ fun AppBottomBar(
                             .background(OrangeMain)
                             .clickable { onItemClick(index) }
                     ) {
-                        Text(item.emoji, fontSize = 22.sp, color = White)
+                        item.iconRes?.let {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = it),
+                                contentDescription = item.label,
+                                modifier = Modifier.size(28.dp),
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(White)
+                            )
+                        } ?: Text(item.emoji ?: "＋", fontSize = 22.sp, color = White)
                     }
                 } else {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .clickable { onItemClick(index) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
                     ) {
-                        Text(item.emoji, fontSize = 20.sp)
+                        item.iconRes?.let {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = it),
+                                contentDescription = item.label,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .padding(bottom = 2.dp),
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
+                                    if (selectedIndex == index) NavSelected else NavUnselected
+                                )
+                            )
+                        } ?: Text(item.emoji ?: "", fontSize = 20.sp)
+                        
                         Text(
                             item.label,
                             color = if (selectedIndex == index) NavSelected else NavUnselected,
