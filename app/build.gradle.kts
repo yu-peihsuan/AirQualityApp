@@ -40,7 +40,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -49,6 +48,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    // ========== 新增的 API 串接與架構套件 ==========
+    // Retrofit 與 Gson 轉換器 (用於打 API 並將 JSON 轉為 Kotlin 物件)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    
+    // ViewModel Compose (用於管理畫面狀態)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
+    // ===============================================
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

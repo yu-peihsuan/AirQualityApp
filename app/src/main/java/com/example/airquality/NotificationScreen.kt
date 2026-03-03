@@ -62,7 +62,7 @@ fun NotificationScreen() {
 
             Spacer(Modifier.height(24.dp))
 
-            Text("歷史紀錄", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextMid)
+            Text("歷史紀錄", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = TextMid)
             Spacer(Modifier.height(12.dp))
 
             NotifyCard(
@@ -107,20 +107,20 @@ fun NotifyCard(
                 .background(emojiBg),
             contentAlignment = Alignment.Center
         ) {
-            Text(emoji, fontSize = 18.sp)
+            Text(emoji, fontSize = 21.sp)
         }
 
         Spacer(Modifier.width(12.dp))
 
         Column(Modifier.weight(1f)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(tag, color = tagColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text(time, color = TextGray, fontSize = 11.sp)
+                Text(tag, color = tagColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(time, color = TextGray, fontSize = 14.sp)
             }
             Spacer(Modifier.height(4.dp))
-            Text(title, color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text(body, color = TextMid, fontSize = 13.sp, lineHeight = 19.sp)
+            Text(body, color = TextMid, fontSize = 16.sp, lineHeight = 22.sp)
         }
     }
 }

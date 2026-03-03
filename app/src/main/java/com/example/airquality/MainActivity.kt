@@ -97,7 +97,7 @@ fun AppBottomBar(
                                 modifier = Modifier.size(28.dp),
                                 colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(White)
                             )
-                        } ?: Text(item.emoji ?: "＋", fontSize = 22.sp, color = White)
+                        } ?: Text(item.emoji ?: "＋", fontSize = 25.sp, color = White)
                     }
                 } else {
                     Column(
@@ -117,12 +117,12 @@ fun AppBottomBar(
                                     if (selectedIndex == index) NavSelected else NavUnselected
                                 )
                             )
-                        } ?: Text(item.emoji ?: "", fontSize = 20.sp)
+                        } ?: Text(item.emoji ?: "", fontSize = 23.sp)
                         
                         Text(
                             item.label,
                             color = if (selectedIndex == index) NavSelected else NavUnselected,
-                            fontSize = 10.sp,
+                            fontSize = 13.sp,
                             fontWeight = if (selectedIndex == index) FontWeight.SemiBold else FontWeight.Normal,
                             textAlign = TextAlign.Center
                         )

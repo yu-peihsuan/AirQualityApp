@@ -15,10 +15,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,18 +42,40 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airquality.ui.theme.*
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    // 注入 ViewModel 來管理狀態
+    viewModel: HomeViewModel = viewModel()
+) {
+    val context = LocalContext.current
+    val sharedPreferences = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+    val defaultAddress = sharedPreferences.getString("default_address", "") ?: ""
+
+    // 監聽來自 ViewModel 的狀態變化
+    val uiState by viewModel.uiState.collectAsState()
+
+    // 當 defaultAddress 改變或第一次進入時，載入空氣品質資料
+    LaunchedEffect(defaultAddress) {
+        viewModel.fetchAirQuality(context, defaultAddress)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgMain)
     ) {
         // ── Header ──────────────────────────────────────────────────────────
+        val displayRegion = if (uiState is AqiUiState.Success) {
+            (uiState as AqiUiState.Success).displayRegion
+        } else {
+            defaultAddress.takeIf { it.isNotBlank() } ?: "臺北市中正區"
+        }
+
         HomeAppHeader(
-            location = "臺北市中正區",
+            location = displayRegion,
             date = "1月9日 週五",
             onBellClick = {}
         )
@@ -58,48 +86,77 @@ fun HomeScreen() {
                 .weight(1f) // 讓主內容佔據剩餘的高度
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.Center // 內容靠中間集中
+            verticalArrangement = Arrangement.Center, // 內容靠中間集中
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── 空氣品質標題 ──────────────────────────────────
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    buildAnnotatedString {
-                        append("空氣")
-                        withStyle(SpanStyle(color = OrangeMain)) { append("不健康") }
-                    },
-                    fontSize = 48.sp, // 字體再放大
-                    fontWeight = FontWeight.Bold,
-                    color = TextDark
-                )
-                Text("最後更新 18:00", color = TextGray, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
-            }
-
-            Spacer(Modifier.height(40.dp)) // 增加文字與臉的間距
-
-            // ── 臉 + AQI 標籤 ───────────────────────────────
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                AqiFace()
-
-                Spacer(Modifier.height(18.dp))
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(OrangeBadge)
-                        .border(1.dp, OrangeMain.copy(alpha = 0.5f), RoundedCornerShape(50))
-                        .padding(horizontal = 24.dp, vertical = 10.dp) // AQI標籤也稍微加大一點 padding
-                ) {
-                    Text("AQI 130 不健康", color = OrangeMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) // AQI 文字也稍微加大
+            // 根據 API 連線狀態顯示不同畫面
+            when (uiState) {
+                is AqiUiState.Loading -> {
+                    CircularProgressIndicator(color = OrangeMain)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("正在取得空氣品質資料...", color = TextGray)
                 }
-            }
+                
+                is AqiUiState.Error -> {
+                    Text(
+                        text = (uiState as AqiUiState.Error).message, 
+                        color = Color.Red,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                
+                is AqiUiState.Success -> {
+                    val successState = uiState as AqiUiState.Success
+                    val nearestRecord = successState.nearestRecord
+                    
+                    val aqiValue = nearestRecord.aqi
+                    val aqiStatus = nearestRecord.status
+                    val pm25 = nearestRecord.pm25
+                    val sitename = nearestRecord.sitename
+                    
+                    // ── 空氣品質標題 ──────────────────────────────────
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            buildAnnotatedString {
+                                append("空氣")
+                                withStyle(SpanStyle(color = OrangeMain)) { append(aqiStatus) }
+                            },
+                            fontSize = 48.sp, // 字體再放大
+                            fontWeight = FontWeight.Bold,
+                            color = TextDark
+                        )
+                        // 顯示最近的測站名稱與對應 PM2.5
+                        Text("最近測站: $sitename | PM2.5: $pm25", color = TextGray, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
+                    }
 
-            Spacer(Modifier.height(50.dp)) // 增加臉與下方按鈕的間距
+                    Spacer(Modifier.height(40.dp)) // 增加文字與臉的間距
 
-            // ── 行動按鈕 ─────────────────────────────────────
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                ActionChip("😷", "外出戴口罩")
-                ActionChip("🪟", "關閉門窗")
-                ActionChip("💨", "空氣清淨機")
+                    // ── 臉 + AQI 標籤 ───────────────────────────────
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        AqiFace()
+
+                        Spacer(Modifier.height(18.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(OrangeBadge)
+                                .border(1.dp, OrangeMain.copy(alpha = 0.5f), RoundedCornerShape(50))
+                                .padding(horizontal = 24.dp, vertical = 10.dp) // AQI標籤也稍微加大一點 padding
+                        ) {
+                            Text("AQI $aqiValue $aqiStatus", color = OrangeMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) // AQI 文字也稍微加大
+                        }
+                    }
+
+                    Spacer(Modifier.height(50.dp)) // 增加臉與下方按鈕的間距
+
+                    // ── 行動按鈕 ─────────────────────────────────────
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        ActionChip("😷", "外出戴口罩")
+                        ActionChip("🪟", "關閉門窗")
+                        ActionChip("💨", "空氣清淨機")
+                    }
+                }
             }
         }
     }

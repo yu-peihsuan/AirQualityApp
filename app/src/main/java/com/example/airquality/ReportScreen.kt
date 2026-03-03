@@ -8,6 +8,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -16,7 +18,11 @@ import com.example.airquality.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen() {
-    var location    by remember { mutableStateOf("臺北市中正區凱達格蘭大道1號") }
+    val context = LocalContext.current
+    val sharedPreferences = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+    val defaultAddress = sharedPreferences.getString("default_address", "")?.takeIf { it.isNotEmpty() } ?: "臺北市中正區凱達格蘭大道1號"
+    
+    var location    by remember { mutableStateOf(defaultAddress) }
     var description by remember { mutableStateOf("") }
     var expanded    by remember { mutableStateOf(false) }
     var category    by remember { mutableStateOf("") }
@@ -123,7 +129,7 @@ fun ReportScreen() {
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = TextDark)
                 ) {
-                    Text("📤", fontSize = 16.sp)
+                    Text("📤", fontSize = 19.sp)
                     Spacer(Modifier.width(6.dp))
                     Text("立即通報", fontWeight = FontWeight.SemiBold)
                 }
@@ -134,5 +140,5 @@ fun ReportScreen() {
 
 @Composable
 fun SectionLabel(text: String) {
-    Text(text, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = TextMid)
+    Text(text, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = TextMid)
 }

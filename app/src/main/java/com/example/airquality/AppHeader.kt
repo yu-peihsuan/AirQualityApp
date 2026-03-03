@@ -42,7 +42,7 @@ fun AppHeader(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    fontSize = 22.sp,
+                    fontSize = 25.sp,
                     fontWeight = FontWeight.Bold,
                     color = HeaderText
                 )
@@ -50,7 +50,7 @@ fun AppHeader(
                     Text(
                         text = subtitle,
                         color = TextGray,
-                        fontSize = 12.sp,
+                        fontSize = 15.sp,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
@@ -98,9 +98,9 @@ fun HomeAppHeader(
                         colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(HeaderText)
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text(location, fontSize = 20.sp, fontWeight = FontWeight.Medium, color = HeaderText) // Location text size
+                    Text(location, fontSize = 23.sp, fontWeight = FontWeight.Medium, color = HeaderText) // Location text size
                 }
-                Text(date, color = TextGray, fontSize = 16.sp, modifier = Modifier.padding(start = 26.dp)) // 再把日期的字體調大一點
+                Text(date, color = TextGray, fontSize = 19.sp, modifier = Modifier.padding(start = 26.dp)) // 再把日期的字體調大一點
             }
             androidx.compose.foundation.Image(
                 painter = androidx.compose.ui.res.painterResource(id = R.drawable.bell),

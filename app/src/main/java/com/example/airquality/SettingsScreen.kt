@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,6 +24,10 @@ fun SettingsScreen() {
     var isPregnant by remember { mutableStateOf(false) }
     var isAllergy  by remember { mutableStateOf(false) }
     var otherText  by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+    val sharedPreferences = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+    var defaultAddress by remember { mutableStateOf(sharedPreferences.getString("default_address", "") ?: "") }
 
     Column(
         modifier = Modifier
@@ -53,7 +59,7 @@ fun SettingsScreen() {
             SettingSection("健康敏感度") {
                 Text(
                     "AI 於你的偏好自動優化風險通知",
-                    color = TextGray, fontSize = 12.sp,
+                    color = TextGray, fontSize = 15.sp,
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
                 HealthCheckRow("氣喘",   isAsthma)   { isAsthma   = it }
@@ -66,7 +72,35 @@ fun SettingsScreen() {
                     onValueChange = { otherText = it },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
-                    placeholder = { Text("其他（請說明）", color = TextGray, fontSize = 13.sp) },
+                    placeholder = { Text("其他（請說明）", color = TextGray, fontSize = 16.sp) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = BgMain,
+                        focusedContainerColor   = BgMain,
+                        unfocusedBorderColor    = DividerColor,
+                        focusedBorderColor      = OrangeMain,
+                    ),
+                    singleLine = true
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // ── 通報設定 ──────────────────────────────────────
+            SettingSection("通報設定") {
+                Text(
+                    "設定後將自動帶入事件通報頁面",
+                    color = TextGray, fontSize = 15.sp,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+                OutlinedTextField(
+                    value = defaultAddress,
+                    onValueChange = { 
+                        defaultAddress = it
+                        sharedPreferences.edit().putString("default_address", it).apply()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    placeholder = { Text("請輸入預設地址", color = TextGray, fontSize = 16.sp) },
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedContainerColor = BgMain,
                         focusedContainerColor   = BgMain,
@@ -96,7 +130,7 @@ fun SettingsScreen() {
 @Composable
 fun SettingSection(title: String?, content: @Composable ColumnScope.() -> Unit) {
     if (title != null) {
-        Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextMid)
+        Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextMid)
         Spacer(Modifier.height(8.dp))
     }
     Column(
@@ -116,8 +150,8 @@ fun SettingInfoRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = TextMid,  fontSize = 14.sp)
-        Text(value, color = TextGray, fontSize = 14.sp)
+        Text(label, color = TextMid,  fontSize = 17.sp)
+        Text(value, color = TextGray, fontSize = 17.sp)
     }
 }
 
@@ -128,7 +162,7 @@ fun HealthCheckRow(label: String, checked: Boolean, onCheck: (Boolean) -> Unit) 
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = TextDark, fontSize = 14.sp)
+        Text(label, color = TextDark, fontSize = 17.sp)
         Checkbox(
             checked = checked,
             onCheckedChange = onCheck,
@@ -144,7 +178,7 @@ fun SettingLinkRow(label: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = TextDark, fontSize = 14.sp)
-        Text("›", color = TextGray, fontSize = 20.sp, fontWeight = FontWeight.Light)
+        Text(label, color = TextDark, fontSize = 17.sp)
+        Text("›", color = TextGray, fontSize = 23.sp, fontWeight = FontWeight.Light)
     }
 }

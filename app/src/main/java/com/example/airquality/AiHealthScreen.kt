@@ -96,7 +96,7 @@ fun AiHealthScreen() {
                     Text(
                         "➤",
                         color = White,
-                        fontSize = 20.sp,
+                        fontSize = 23.sp,
                         modifier = Modifier.padding(2.dp)
                     )
                 }
@@ -114,7 +114,7 @@ fun AiBubble(text: String, subText: String = "") {
                 .clip(CircleShape)
                 .background(OrangeBadge),
             contentAlignment = Alignment.Center
-        ) { Text("🤖", fontSize = 18.sp) }
+        ) { Text("🤖", fontSize = 21.sp) }
 
         Spacer(Modifier.width(10.dp))
 
@@ -125,10 +125,10 @@ fun AiBubble(text: String, subText: String = "") {
                 .padding(14.dp)
                 .widthIn(max = 280.dp)
         ) {
-            Text(text, color = TextDark, fontSize = 14.sp, lineHeight = 21.sp)
+            Text(text, color = TextDark, fontSize = 17.sp, lineHeight = 24.sp)
             if (subText.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                Text(subText, color = TextMid, fontSize = 13.sp, lineHeight = 20.sp)
+                Text(subText, color = TextMid, fontSize = 16.sp, lineHeight = 23.sp)
             }
         }
     }
@@ -144,7 +144,7 @@ fun UserBubble(text: String) {
                 .padding(14.dp)
                 .widthIn(max = 280.dp)
         ) {
-            Text(text, color = TextDark, fontSize = 14.sp, lineHeight = 21.sp)
+            Text(text, color = TextDark, fontSize = 17.sp, lineHeight = 24.sp)
         }
     }
 }
