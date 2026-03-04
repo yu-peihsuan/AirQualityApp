@@ -1,0 +1,174 @@
+﻿./gradlew : WARNING: 
+A restricted method i
+n java.lang.System ha
+s been called
+位於 線路:1 字元:1
++ ./gradlew compileDe
+bugKotlin > compile_o
+utput.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (WARNING   
+ : A rest...has b    
+een called:Strin    g
+) [], RemoteExc    ep
+tion
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+WARNING: java.lang.Sy
+stem::load has been c
+alled by net.rubygrap
+efruit.platform.inter
+nal.NativeLibraryLoad
+er in an unnamed modu
+le (file:/C:/Users/Us
+er/.gradle/wrapper/di
+sts/gradle-8.13-bin/5
+xuhj0ry160q40clulazy9
+h7d/gradle-8.13/lib/n
+ative-platform-0.22-m
+ilestone-28.jar)
+WARNING: Use --enable
+-native-access=ALL-UN
+NAMED to avoid a warn
+ing for callers in th
+is module
+WARNING: Restricted m
+ethods will be blocke
+d in a future release
+ unless native access
+ is enabled
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+
+> Task :app:compileDebugKotlin FAILED
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:224:9 Th
+is variable must eith
+er have an explicit t
+ype or be initialized
+.
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:224:16 S
+yntax error: Unexpect
+ed tokens (use ';' to
+ separate expressions
+ on the same line).
+16 actionable tasks: 1 executed, 15 up-to-date
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:235:68 U
+nresolved reference '
+brow?暹?offset'.
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:235:118 
+Unresolved reference 
+'brow?暹?offset'.
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:236:68 U
+nresolved reference '
+brow?暹?offset'.
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:236:118 
+Unresolved reference 
+'brow?暹?offset'.
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:240:68 U
+nresolved reference '
+brow?暹?offset'.
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:240:118 
+Unresolved reference 
+'brow?暹?offset'.
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:241:68 U
+nresolved reference '
+brow?暹?offset'.
+e: file:///C:/CODES/p
+roject/AirQualityApp/
+app/src/main/java/com
+/example/airquality/H
+omeScreen.kt:241:118 
+Unresolved reference 
+'brow?暹?offset'.
+
+FAILURE: Build failed
+ with an exception.
+
+* What went wrong:
+Execution failed for 
+task ':app:compileDeb
+ugKotlin'.
+> A failure occurred 
+while executing org.j
+etbrains.kotlin.compi
+lerRunner.GradleCompi
+lerRunnerWithWorkers$
+GradleKotlinCompilerW
+orkAction
+   > Compilation erro
+r. See log for more d
+etails
+
+* Try:
+> Run with --stacktra
+ce option to get the 
+stack trace.
+> Run with --info or 
+--debug option to get
+ more log output.
+> Run with --scan to 
+get full insights.
+> Get more help at ht
+tps://help.gradle.org
+.
+
+BUILD FAILED in 5s

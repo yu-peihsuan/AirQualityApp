@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.math.*
 
 // 定義畫面可能的三種狀態
@@ -56,16 +59,30 @@ class HomeViewModel : ViewModel() {
                             val adminStr = addr.adminArea ?: ""
                             val subAdminStr = addr.subAdminArea ?: addr.locality ?: ""
                             
-                            displayRegion = buildString {
+                        displayRegion = buildString {
                                 if (adminStr.isNotBlank()) append(adminStr)
                                 if (subAdminStr.isNotBlank() && subAdminStr != adminStr) append(subAdminStr)
                             }.takeIf { it.isNotBlank() } ?: defaultAddress.take(6)
                         } else {
-                            displayRegion = defaultAddress.take(6)
+                            val fallback = getCoordinatesFromOSM(defaultAddress)
+                            if (fallback != null) {
+                                targetLat = fallback.first
+                                targetLng = fallback.second
+                                displayRegion = defaultAddress.take(6)
+                            } else {
+                                displayRegion = defaultAddress.take(6)
+                            }
                         }
                     } catch (e: Exception) {
                         Log.e("Geocoder", "轉換地址失敗", e)
-                        displayRegion = defaultAddress.take(6)
+                        val fallback = getCoordinatesFromOSM(defaultAddress)
+                        if (fallback != null) {
+                            targetLat = fallback.first
+                            targetLng = fallback.second
+                            displayRegion = defaultAddress.take(6)
+                        } else {
+                            displayRegion = defaultAddress.take(6)
+                        }
                     }
                 }
 
@@ -90,5 +107,33 @@ class HomeViewModel : ViewModel() {
         val a = sin(dLat / 2) * sin(dLat / 2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2) * sin(dLon / 2)
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return R * c
+    }
+
+    // 備用方案: 透過 OpenStreetMap 的 Nominatim API 將地址轉為經緯度
+    private suspend fun getCoordinatesFromOSM(address: String): Pair<Double, Double>? = withContext(Dispatchers.IO) {
+        try {
+            val encodedAddress = java.net.URLEncoder.encode(address, "UTF-8")
+            val urlString = "https://nominatim.openstreetmap.org/search?q=\$encodedAddress&format=json&limit=1"
+            val url = URL(urlString)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("User-Agent", "AirQualityApp/1.0 (Android fallback)")
+            
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val responseString = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseString)
+                if (jsonArray.length() > 0) {
+                    val locationObj = jsonArray.getJSONObject(0)
+                    val lat = locationObj.getString("lat").toDoubleOrNull()
+                    val lon = locationObj.getString("lon").toDoubleOrNull()
+                    if (lat != null && lon != null) {
+                        return@withContext Pair(lat, lon)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("OSM_Geocoder", "備用 API 例外錯誤: \${e.message}")
+        }
+        return@withContext null
     }
 }

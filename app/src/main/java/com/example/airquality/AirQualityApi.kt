@@ -14,7 +14,8 @@ data class AqiRecord(
     val status: String,
     @SerializedName("pm2.5") val pm25: String,
     val latitude: String,
-    val longitude: String
+    val longitude: String,
+    val publishtime: String? = null
 )
 
 // 定義從後端接收的資料結構 (對應你 Python 後端的格式)

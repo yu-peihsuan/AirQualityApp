@@ -40,3 +40,25 @@ val HeaderBorder  = Color(0xFFEAE8E8)   // Header 底部線
 val NavBg         = Color(0xFFF9F8F8)   // 底部列背景
 val NavSelected   = Color(0xFF444444)   // 選中分頁文字
 val NavUnselected = Color(0xFF999999)   // 未選中分頁文字
+
+// ── AQI 標準顏色 ─────────────────────────────────────
+val AqiGreen = Color(0xFF7EC366)   // 良好
+val AqiYellow = Color(0xFFFBC853)  // 普通
+val AqiOrange = Color(0xFFEA580C)  // 對敏感族群不良
+val AqiRed = Color(0xFFCC0033)     // 對所有族群不良
+val AqiPurple = Color(0xFF660099)  // 非常不良
+val AqiMaroon = Color(0xFF7E0023)  // 危害
+
+fun getAqiColor(status: String): Color {
+    return when {
+        status.contains("良好") -> AqiGreen
+        status.contains("普通") -> AqiYellow
+        status.contains("對敏感族群不健康") -> AqiOrange
+        status.contains("對所有族群不健康") -> AqiRed
+        status.contains("非常不健康") -> AqiPurple
+        status.contains("危害") -> AqiMaroon
+        else -> AqiGreen // Fallback
+    }
+}
+
+

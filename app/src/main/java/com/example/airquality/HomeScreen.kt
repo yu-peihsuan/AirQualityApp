@@ -34,6 +34,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airquality.ui.theme.*
+import java.util.Calendar
 
 @Composable
 fun HomeScreen(
@@ -67,16 +69,16 @@ fun HomeScreen(
             .fillMaxSize()
             .background(BgMain)
     ) {
-        // ── Header ──────────────────────────────────────────────────────────
-        val displayRegion = if (uiState is AqiUiState.Success) {
-            (uiState as AqiUiState.Success).displayRegion
+        val locationText = if (uiState is AqiUiState.Success) {
+            val nearest = (uiState as AqiUiState.Success).nearestRecord
+            "鄰近測站: ${nearest.sitename}"
         } else {
-            defaultAddress.takeIf { it.isNotBlank() } ?: "臺北市中正區"
+            "鄰近測站: 搜尋中..."
         }
 
         HomeAppHeader(
-            location = displayRegion,
-            date = "1月9日 週五",
+            location = locationText,
+            date = getCurrentDateString(),
             onBellClick = {}
         )
 
@@ -92,9 +94,15 @@ fun HomeScreen(
             // 根據 API 連線狀態顯示不同畫面
             when (uiState) {
                 is AqiUiState.Loading -> {
-                    CircularProgressIndicator(color = OrangeMain)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("正在取得空氣品質資料...", color = TextGray)
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(color = OrangeMain)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("正在取得空氣品質資料...", color = TextGray, textAlign = TextAlign.Center)
+                    }
                 }
                 
                 is AqiUiState.Error -> {
@@ -111,6 +119,7 @@ fun HomeScreen(
                     
                     val aqiValue = nearestRecord.aqi
                     val aqiStatus = nearestRecord.status
+                    val aqiColor = getAqiColor(aqiStatus)
                     val pm25 = nearestRecord.pm25
                     val sitename = nearestRecord.sitename
                     
@@ -119,32 +128,41 @@ fun HomeScreen(
                         Text(
                             buildAnnotatedString {
                                 append("空氣")
-                                withStyle(SpanStyle(color = OrangeMain)) { append(aqiStatus) }
+                                withStyle(SpanStyle(color = aqiColor)) { append(aqiStatus) }
                             },
-                            fontSize = 48.sp, // 字體再放大
+                            fontSize = 48.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextDark
                         )
-                        // 顯示最近的測站名稱與對應 PM2.5
-                        Text("最近測站: $sitename | PM2.5: $pm25", color = TextGray, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
+                        // 顯示更新時間
+                        val publishtime = nearestRecord.publishtime ?: ""
+                        val updateTimeStr = if (publishtime.contains(" ")) {
+                            val timePart = publishtime.substringAfter(" ")
+                            val timeParts = timePart.split(":")
+                            if (timeParts.size >= 2) "${timeParts[0]}:${timeParts[1]}" else "12:00"
+                        } else {
+                            "12:00"
+                        }
+                        Text("更新時間 $updateTimeStr", color = TextGray, fontSize = 18.sp, modifier = Modifier.padding(top = 8.dp))
                     }
 
                     Spacer(Modifier.height(40.dp)) // 增加文字與臉的間距
 
                     // ── 臉 + AQI 標籤 ───────────────────────────────
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        AqiFace()
+                        val aqiInt = aqiValue.toIntOrNull() ?: 0
+                        AqiFace(aqiInt)
 
                         Spacer(Modifier.height(18.dp))
 
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .background(OrangeBadge)
-                                .border(1.dp, OrangeMain.copy(alpha = 0.5f), RoundedCornerShape(50))
-                                .padding(horizontal = 24.dp, vertical = 10.dp) // AQI標籤也稍微加大一點 padding
+                                .background(aqiColor.copy(alpha = 0.15f))
+                                .border(1.dp, aqiColor.copy(alpha = 0.5f), RoundedCornerShape(50))
+                                .padding(horizontal = 30.dp, vertical = 14.dp) // AQI標籤加大
                         ) {
-                            Text("AQI $aqiValue $aqiStatus", color = OrangeMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) // AQI 文字也稍微加大
+                            Text("AQI $aqiValue $aqiStatus", color = aqiColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) // 文字再加大
                         }
                     }
 
@@ -152,9 +170,15 @@ fun HomeScreen(
 
                     // ── 行動按鈕 ─────────────────────────────────────
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        ActionChip("😷", "外出戴口罩")
-                        ActionChip("🪟", "關閉門窗")
-                        ActionChip("💨", "空氣清淨機")
+                        val currentAqiInt = aqiValue.toIntOrNull() ?: 0
+                        if (currentAqiInt > 90) {
+                            ActionChip(R.drawable.mask, "外出戴口罩", aqiColor)
+                            ActionChip(R.drawable.window, "關閉門窗", aqiColor)
+                            ActionChip(R.drawable.air_purifier, "空氣清淨機", aqiColor)
+                        } else {
+                            ActionChip(R.drawable.bicycle, "戶外活動", aqiColor)
+                            ActionChip(R.drawable.open_window, "開窗通風", aqiColor)
+                        }
                     }
                 }
             }
@@ -162,10 +186,11 @@ fun HomeScreen(
     }
 }
 
-// ── 臉 (Canvas 繪製) ──────────────────────────────────────────────────────
+
+// ── 臉 (Canvas 繪製) 部分完整修改 ──────────────────────────────────────────
 
 @Composable
-fun AqiFace() {
+fun AqiFace(aqiValue: Int) {
     Box(
         modifier = Modifier
             .size(180.dp)
@@ -173,60 +198,166 @@ fun AqiFace() {
             .background(FaceBg),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) { drawFace() }
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // 將 AQI 數值傳遞給繪製函式
+            drawDynamicFace(aqiValue)
+        }
     }
 }
 
-fun DrawScope.drawFace() {
+fun DrawScope.drawDynamicFace(aqiValue: Int) {
     val cx = size.width / 2f
     val cy = size.height / 2f
+    // 臉部主要半徑基準
     val r  = minOf(cx, cy) * 0.82f
+    
+    // 顏色定義
     val browColor   = Color(0xFF5C3A1E)
     val eyeColor    = Color(0xFF3D2210)
     val maskColor   = Color(0xFFF8F8F8)
     val stripeColor = Color(0xFFDDDDDD)
+    
+    // 筆觸寬度基準
     val bw = r * 0.065f
 
-    // 眉毛（皺眉：外高內低）
-    drawLine(browColor, Offset(cx - r * 0.58f, cy - r * 0.44f), Offset(cx - r * 0.12f, cy - r * 0.28f), bw, StrokeCap.Round)
-    drawLine(browColor, Offset(cx + r * 0.12f, cy - r * 0.28f), Offset(cx + r * 0.58f, cy - r * 0.44f), bw, StrokeCap.Round)
+    // ── 計算特徵坐標 (根據 R 基準) ──
+    
+    // 眼睛坐標
+    val eyeY = cy - r * 0.08f
+    val lEyeCx = cx - r * 0.33f
+    val rEyeCx = cx + r * 0.33f
+    val eyeSize = r * 0.085f
 
-    // 眼睛
-    drawCircle(eyeColor, r * 0.085f, Offset(cx - r * 0.33f, cy - r * 0.08f))
-    drawCircle(eyeColor, r * 0.085f, Offset(cx + r * 0.33f, cy - r * 0.08f))
+    // 眉毛坐標基準
+    val browYBase = cy - r * 0.36f // 眉毛的平均高度
+    val browHalfW = r * 0.23f      // 眉毛單邊長度的一半
+    val lBrowCx = cx - r * 0.35f  // 左眉中心 X
+    val rBrowCx = cx + r * 0.35f  // 右眉中心 X
+    val browOffset = r * 0.08f // 眉毛高低差
 
-    // 口罩
-    val maskLeft = cx - r * 0.72f
-    val maskTop  = cy + r * 0.08f
-    val maskW    = r * 1.44f
-    val maskH    = r * 0.70f
-    drawRoundRect(maskColor, Offset(maskLeft, maskTop), Size(maskW, maskH), CornerRadius(r * 0.13f))
+    // ── 1. 畫眉毛 (根據 AQI 改變形狀) ──
+    when {
+        // 良好/普通 (<=100): 平眉 (Flat)
+        aqiValue <= 100 -> {
+            drawLine(browColor, Offset(lBrowCx - browHalfW, browYBase), Offset(lBrowCx + browHalfW, browYBase), bw, StrokeCap.Round)
+            drawLine(browColor, Offset(rBrowCx - browHalfW, browYBase), Offset(rBrowCx + browHalfW, browYBase), bw, StrokeCap.Round)
+        }
+        // 敏感不佳 (101-150): 八字眉/憂慮 (Worried: 外高內低)
+        aqiValue <= 150 -> {
+            drawLine(browColor, Offset(lBrowCx - browHalfW, browYBase - browOffset), Offset(lBrowCx + browHalfW, browYBase + browOffset), bw, StrokeCap.Round)
+            drawLine(browColor, Offset(rBrowCx - browHalfW, browYBase + browOffset), Offset(rBrowCx + browHalfW, browYBase - browOffset), bw, StrokeCap.Round)
+        }
+        // 不良以上 (>150): 皺眉/生氣 (Frown: 內高外低 - 原本的樣子)
+        else -> {
+            drawLine(browColor, Offset(lBrowCx - browHalfW, browYBase + browOffset), Offset(lBrowCx + browHalfW, browYBase - browOffset), bw, StrokeCap.Round)
+            drawLine(browColor, Offset(rBrowCx - browHalfW, browYBase - browOffset), Offset(rBrowCx + browHalfW, browYBase + browOffset), bw, StrokeCap.Round)
+        }
+    }
 
-    // 口罩橫線
-    val sx = maskLeft + maskW * 0.08f
-    val sw = maskW * 0.84f
-    val st = r * 0.028f
-    drawLine(stripeColor, Offset(sx, maskTop + maskH * 0.38f), Offset(sx + sw, maskTop + maskH * 0.38f), st)
-    drawLine(stripeColor, Offset(sx + maskW * 0.05f, maskTop + maskH * 0.68f), Offset(sx + sw - maskW * 0.05f, maskTop + maskH * 0.68f), st)
+    // ── 2. 畫眼睛 (根據 AQI 改變形狀) ──
+    if (aqiValue > 300) {
+        // 有害 (>300): X X 眼 (使用四條線組成)
+        val xSize = eyeSize * 1.2f // X 比圓眼稍微大一點
+        // Left X
+        drawLine(eyeColor, Offset(lEyeCx - xSize, eyeY - xSize), Offset(lEyeCx + xSize, eyeY + xSize), bw * 0.8f, StrokeCap.Round)
+        drawLine(eyeColor, Offset(lEyeCx - xSize, eyeY + xSize), Offset(lEyeCx + xSize, eyeY - xSize), bw * 0.8f, StrokeCap.Round)
+        // Right X
+        drawLine(eyeColor, Offset(rEyeCx - xSize, eyeY - xSize), Offset(rEyeCx + xSize, eyeY + xSize), bw * 0.8f, StrokeCap.Round)
+        drawLine(eyeColor, Offset(rEyeCx - xSize, eyeY + xSize), Offset(rEyeCx + xSize, eyeY - xSize), bw * 0.8f, StrokeCap.Round)
+    } else {
+        // 其他 (<=300): 圓眼 (原本的樣子)
+        drawCircle(eyeColor, eyeSize, Offset(lEyeCx, eyeY))
+        drawCircle(eyeColor, eyeSize, Offset(rEyeCx, eyeY))
+    }
+
+    // ── 3. 畫口罩 或 嘴巴 (根據 AQI 決定) ──
+    if (aqiValue > 100) {
+        // 空氣不佳 (>100): 戴口罩 (原本的繪製邏輯)
+        
+        val maskLeft = cx - r * 0.72f
+        val maskTop  = cy + r * 0.08f
+        val maskW    = r * 1.44f
+        val maskH    = r * 0.70f
+        drawRoundRect(maskColor, Offset(maskLeft, maskTop), Size(maskW, maskH), CornerRadius(r * 0.13f))
+
+        // 口罩橫線
+        val sx = maskLeft + maskW * 0.08f
+        val sw = maskW * 0.84f
+        val st = r * 0.028f
+        drawLine(stripeColor, Offset(sx, maskTop + maskH * 0.38f), Offset(sx + sw, maskTop + maskH * 0.38f), st)
+        drawLine(stripeColor, Offset(sx + maskW * 0.05f, maskTop + maskH * 0.68f), Offset(sx + sw - maskW * 0.05f, maskTop + maskH * 0.68f), st)
+        
+    } else {
+        // 空氣尚可 (<=100): 不戴口罩，畫嘴巴
+        
+        val mouthY = cy + r * 0.3f
+        val mouthW = r * 0.35f
+        
+        if (aqiValue <= 50) {
+            // 良好 (0-50): 開心微笑 (使用圓弧)
+            drawArc(
+                color = eyeColor,
+                startAngle = 0f,    // 從 3 點鐘方向開始
+                sweepAngle = 180f,  // 掃掠 180 度 (下半圓)
+                useCenter = false,
+                topLeft = Offset(cx - mouthW, mouthY - mouthW * 0.5f),
+                size = Size(mouthW * 2f, mouthW), // 扁平的圓弧
+                style = Stroke(width = bw, cap = StrokeCap.Round)
+            )
+        } else {
+            // 普通 (51-100): 平淡 (一條直線)
+            val lineMouthW = mouthW * 0.8f
+            drawLine(
+                color = eyeColor,
+                start = Offset(cx - lineMouthW, mouthY + r*0.1f),
+                end = Offset(cx + lineMouthW, mouthY + r*0.1f),
+                strokeWidth = bw,
+                cap = StrokeCap.Round
+            )
+        }
+    }
 }
 
 // ── 行動按鈕卡片 ─────────────────────────────────────────────────────────
 
 @Composable
-fun ActionChip(emoji: String, label: String) {
+fun ActionChip(iconRes: Int, label: String, color: Color) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(OrangeBadge.copy(alpha = 0.5f)) // 背景變得更透明一點
+            .background(color.copy(alpha = 0.15f)) // 背景依 AQI 顏色透明化
             .clickable {}
-            .border(1.dp, OrangeMain.copy(alpha = 0.3f), RoundedCornerShape(20.dp)) // 外框也變淡一點點
+            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(20.dp)) // 外框依 AQI 顏色
             .height(130.dp) // 給定固定的高度讓它長一點
-            .width(90.dp)   // 把寬度稍微縮回來，讓三個框距比較開
+            .width(110.dp)   // 把寬度稍微縮回來，讓三個框距比較開
     ) {
-        Text(emoji, fontSize = 36.sp) // Emoji 變大
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = iconRes),
+            contentDescription = label,
+            modifier = Modifier.size(42.dp),
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black) // 圖片固定用黑色
+        )
         Spacer(Modifier.height(12.dp))
-        Text(label, color = OrangeMain, fontSize = 13.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center) // 改為橘色字體
+        Text(label, color = color, fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center) // 改為 AQI 文字顏色
     }
+}
+
+//取得當下時間
+fun getCurrentDateString(): String {
+    val calendar = Calendar.getInstance()
+    val month = calendar.get(Calendar.MONTH) + 1
+    val day = calendar.get(Calendar.DAY_OF_MONTH)
+    val dayOfWeek = when (calendar.get(Calendar.DAY_OF_WEEK)) {
+        Calendar.SUNDAY -> "週日"
+        Calendar.MONDAY -> "週一"
+        Calendar.TUESDAY -> "週二"
+        Calendar.WEDNESDAY -> "週三"
+        Calendar.THURSDAY -> "週四"
+        Calendar.FRIDAY -> "週五"
+        Calendar.SATURDAY -> "週六"
+        else -> ""
+    }
+    return "${month}月${day}日 $dayOfWeek"
 }
