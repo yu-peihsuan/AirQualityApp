@@ -26,10 +26,29 @@ data class AirQualityResponse(
     val records: List<AqiRecord> = emptyList()
 )
 
+data class WeatherRecord(
+    val sitename: String,
+    val county: String,
+    val latitude: String? = null,
+    val longitude: String? = null,
+    @SerializedName("WindSpeed") val windSpeed: String,
+    @SerializedName("WindDirection") val windDirection: String
+)
+
+data class WeatherResponse(
+    val status: String,
+    val county: String?,
+    val message: String,
+    val records: List<WeatherRecord> = emptyList()
+)
+
 // 定義 API 請求行為
 interface AirQualityApiService {
     @GET("api/air_quality")
     suspend fun getAirQuality(@Query("county") county: String? = null): AirQualityResponse
+
+    @GET("api/weather")
+    suspend fun getWeather(@Query("county") county: String? = null): WeatherResponse
 }
 
 // 建立連線實體

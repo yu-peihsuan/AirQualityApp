@@ -20,10 +20,17 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,10 +65,28 @@ fun HomeScreen(
 
     // 監聽來自 ViewModel 的狀態變化
     val uiState by viewModel.uiState.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 當 defaultAddress 改變或第一次進入時，載入空氣品質資料
-    LaunchedEffect(defaultAddress) {
+    // 管理當前顯示的日期，讓它可以在回到畫面時更新
+    var currentDateString by remember { mutableStateOf(getCurrentDateString()) }
+
+    // 當 lifecycle 狀態改變（回到前景 ON_RESUME）時更新日期並重新抓取空氣品質資料
+    DisposableEffect(lifecycleOwner, defaultAddress) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                currentDateString = getCurrentDateString()
+                viewModel.fetchAirQuality(context, defaultAddress)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        
+        // 第一次進入時也主動抓取一次
+        currentDateString = getCurrentDateString()
         viewModel.fetchAirQuality(context, defaultAddress)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     Column(
@@ -78,7 +103,7 @@ fun HomeScreen(
 
         HomeAppHeader(
             location = locationText,
-            date = getCurrentDateString(),
+            date = currentDateString,
             onBellClick = {}
         )
 
@@ -120,6 +145,10 @@ fun HomeScreen(
                     val aqiValue = nearestRecord.aqi
                     val aqiStatus = nearestRecord.status
                     val aqiColor = getAqiColor(aqiStatus)
+                    val displayStatus = when (aqiStatus) {
+                        "對敏感族群不健康", "對所有族群不健康" -> "不健康"
+                        else -> aqiStatus
+                    }
                     val pm25 = nearestRecord.pm25
                     val sitename = nearestRecord.sitename
                     
@@ -128,7 +157,7 @@ fun HomeScreen(
                         Text(
                             buildAnnotatedString {
                                 append("空氣")
-                                withStyle(SpanStyle(color = aqiColor)) { append(aqiStatus) }
+                                withStyle(SpanStyle(color = aqiColor)) { append(displayStatus) }
                             },
                             fontSize = 48.sp,
                             fontWeight = FontWeight.Bold,
@@ -162,7 +191,7 @@ fun HomeScreen(
                                 .border(1.dp, aqiColor.copy(alpha = 0.5f), RoundedCornerShape(50))
                                 .padding(horizontal = 30.dp, vertical = 14.dp) // AQI標籤加大
                         ) {
-                            Text("AQI $aqiValue $aqiStatus", color = aqiColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) // 文字再加大
+                            Text("AQI $aqiValue $displayStatus", color = aqiColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) // 文字再加大
                         }
                     }
 

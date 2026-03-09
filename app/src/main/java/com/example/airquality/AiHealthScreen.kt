@@ -14,23 +14,56 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airquality.ui.theme.*
 
 data class ChatMessage(val text: String, val isUser: Boolean, val subText: String = "")
 
 @Composable
-fun AiHealthScreen() {
+fun AiHealthScreen(
+    homeViewModel: HomeViewModel = viewModel()
+) {
     var inputText by remember { mutableStateOf("") }
-    val messages  = remember {
+    
+    // 觀測 AQI 與 天氣狀態
+    val aqiState by homeViewModel.uiState.collectAsState()
+    val weatherState by homeViewModel.weatherState.collectAsState()
+    
+    // 動態產生 AI 顧問訊息
+    val dynamicAiMessage = remember(aqiState, weatherState) {
+        val aqiPart = when (aqiState) {
+            is AqiUiState.Success -> {
+                val data = (aqiState as AqiUiState.Success).nearestRecord
+                "最鄰近空氣品質測站為${data.sitename}"
+            }
+            is AqiUiState.Loading -> "正在尋找最鄰近的空氣品質測站..."
+            is AqiUiState.Error -> "無法取得空氣品質資料"
+        }
+
+        val weatherPart = when (weatherState) {
+            is WeatherUiState.Success -> {
+                val wData = (weatherState as WeatherUiState.Success).nearestRecord
+                val directionString = homeViewModel.getWindDirectionString(wData.windDirection, wData.windSpeed)
+                "目前最鄰近的氣象站為${wData.sitename}氣象站，風速為 ${wData.windSpeed} m/s，風向為 $directionString"
+            }
+            is WeatherUiState.Loading -> "正在取得氣象資料..."
+            is WeatherUiState.Error -> "無法取得氣象資料"
+        }
+        
+        // 結合成一句話
+        if (aqiState is AqiUiState.Success || weatherState is WeatherUiState.Success) {
+            "$aqiPart，$weatherPart。"
+        } else {
+            "正在為您分析環境資料中..."
+        }
+    }
+
+    val messages = remember(dynamicAiMessage) {
         mutableStateListOf(
             ChatMessage(
-                "王先生您好，你的附近有火警，受東北季風影響，您正處於潛傷下風處。",
-                isUser  = false,
-                subText = "考量您有氣喘疾病，建議您暫時關閉窗戶並暫停戶外運動。"
-            ),
-            ChatMessage(
-                "王先生您好，現在空氣良好，對您的呼吸道負擔較小，適合出門運動。",
-                isUser = false
+                dynamicAiMessage,
+                isUser = false,
+                subText = "這是我為您整理的最新環境資訊，請問有什麼我可以幫忙的嗎？"
             )
         )
     }
