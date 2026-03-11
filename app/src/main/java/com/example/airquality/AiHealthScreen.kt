@@ -3,181 +3,142 @@ package com.example.airquality
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airquality.ui.theme.*
 
-data class ChatMessage(val text: String, val isUser: Boolean, val subText: String = "")
+// 定義訊息資料結構，增加是否為警告狀態的判斷
+data class ChatMessage(
+    val text: String,
+    val subText: String = "",
+    val isWarning: Boolean = false
+)
 
 @Composable
 fun AiHealthScreen(
     homeViewModel: HomeViewModel = viewModel()
 ) {
-    var inputText by remember { mutableStateOf("") }
-    
     // 觀測 AQI 與 天氣狀態
     val aqiState by homeViewModel.uiState.collectAsState()
     val weatherState by homeViewModel.weatherState.collectAsState()
-    
-    // 動態產生 AI 顧問訊息
-    val dynamicAiMessage = remember(aqiState, weatherState) {
-        val aqiPart = when (aqiState) {
-            is AqiUiState.Success -> {
-                val data = (aqiState as AqiUiState.Success).nearestRecord
-                "最鄰近空氣品質測站為${data.sitename}"
-            }
-            is AqiUiState.Loading -> "正在尋找最鄰近的空氣品質測站..."
-            is AqiUiState.Error -> "無法取得空氣品質資料"
-        }
 
-        val weatherPart = when (weatherState) {
-            is WeatherUiState.Success -> {
-                val wData = (weatherState as WeatherUiState.Success).nearestRecord
-                val directionString = homeViewModel.getWindDirectionString(wData.windDirection, wData.windSpeed)
-                "目前最鄰近的氣象站為${wData.sitename}氣象站，風速為 ${wData.windSpeed} m/s，風向為 $directionString"
-            }
-            is WeatherUiState.Loading -> "正在取得氣象資料..."
-            is WeatherUiState.Error -> "無法取得氣象資料"
-        }
+    // 模擬圖片中的兩則訊息資料
+    val baseMessages = mutableListOf<ChatMessage>()
+
+    if (aqiState is AqiUiState.Success && weatherState is WeatherUiState.Success) {
+        val aqiRecord = (aqiState as AqiUiState.Success).nearestRecord
+        val weatherRecord = (weatherState as WeatherUiState.Success).nearestRecord
+        val windDirString = homeViewModel.getWindDirectionString(weatherRecord.windDirection, weatherRecord.windSpeed)
         
-        // 結合成一句話
-        if (aqiState is AqiUiState.Success || weatherState is WeatherUiState.Success) {
-            "$aqiPart，$weatherPart。"
-        } else {
-            "正在為您分析環境資料中..."
-        }
-    }
+        val isUnhealthy = aqiRecord.status.contains("不良") || 
+                          aqiRecord.status.contains("不佳") || 
+                          aqiRecord.status.contains("不健康") || 
+                          aqiRecord.status.contains("有害") ||
+                          aqiRecord.status.contains("危險") ||
+                          aqiRecord.status.contains("警告")
 
-    val messages = remember(dynamicAiMessage) {
-        mutableStateListOf(
+        baseMessages.add(
             ChatMessage(
-                dynamicAiMessage,
-                isUser = false,
-                subText = "這是我為您整理的最新環境資訊，請問有什麼我可以幫忙的嗎？"
+                text = "您附近的測站為${aqiRecord.sitename}測站，空氣品質為${aqiRecord.status}。最近氣象測站為${weatherRecord.sitename}，風速${weatherRecord.windSpeed}，吹$windDirString",
+                isWarning = isUnhealthy
             )
         )
     }
 
+    val messages = baseMessages.toList()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgMain)
+            .background(Color(0xFFFFFFFF)) 
     ) {
         // ── Header ──────────────────────────────────────────────────────────
-        AppHeader(
-            title = "AI 健康顧問",
-            subtitle = "根據您的健康狀況與空氣品質提供建議"
-        )
+        AppHeader(title = "AI 健康顧問", centeredTitle = true, fontSize = 18.sp)
 
-        // ── 訊息列表 ─────────────────────────────────────
+        // ── 訊息列表 (帶框框的卡片) ─────────────────────────────────────
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 20.dp)
         ) {
-            messages.forEach { msg ->
-                if (msg.isUser) UserBubble(msg.text) else AiBubble(msg.text, msg.subText)
-            }
-            Spacer(Modifier.height(8.dp))
-        }
+            Spacer(Modifier.height(20.dp))
+            
 
-        // ── 輸入列 ────────────────────────────────────────
-        Surface(color = CardWhite, shadowElevation = 8.dp) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(24.dp),
-                    placeholder = { Text("輸入您的問題…", color = TextGray) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = BgMain,
-                        focusedContainerColor   = BgMain,
-                        unfocusedBorderColor    = DividerColor,
-                        focusedBorderColor      = OrangeMain,
-                    ),
-                    singleLine = true
-                )
-                Spacer(Modifier.width(8.dp))
 
-                // 傳送按鈕（用 Emoji）
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(OrangeMain),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "➤",
-                        color = White,
-                        fontSize = 23.sp,
-                        modifier = Modifier.padding(2.dp)
-                    )
+            messages.forEachIndexed { index, msg ->
+                HealthAdviceCard(msg)
+                if (index < messages.size - 1) {
+                    Spacer(Modifier.height(12.dp))
                 }
             }
+            Spacer(Modifier.height(32.dp))
         }
     }
 }
 
 @Composable
-fun AiBubble(text: String, subText: String = "") {
-    Row(verticalAlignment = Alignment.Top) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(OrangeBadge),
-            contentAlignment = Alignment.Center
-        ) { Text("🤖", fontSize = 21.sp) }
+fun HealthAdviceCard(message: ChatMessage) {
+    // 根據是否為警告切換顏色
+    val backgroundColor = if (message.isWarning) Color(0xFFFDF2F2) else Color(0xFFF2F9E8)
+    val borderColor = if (message.isWarning) Color(0xFFF5E0E0) else Color(0xFFE5EFD8)
 
-        Spacer(Modifier.width(10.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(backgroundColor)
+            .padding(16.dp)
+    ) {
+            // 主要文字
+            Text(
+                text = message.text,
+                color = Color(0xFF444444),
+                fontSize = 18.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.Medium
+            )
 
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp))
-                .background(BubbleLeft)
-                .padding(14.dp)
-                .widthIn(max = 280.dp)
-        ) {
-            Text(text, color = TextDark, fontSize = 17.sp, lineHeight = 24.sp)
-            if (subText.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text(subText, color = TextMid, fontSize = 16.sp, lineHeight = 23.sp)
+            // 如果有次要建議文字，顯示內層的小框框
+            if (message.subText.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Surface(
+                    color = Color(0xFFF4E7E7), // 內層稍深的粉色
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        // 盾牌圖示
+                        Icon(
+                            imageVector = Icons.Outlined.Warning,
+                            contentDescription = "Warning",
+                            modifier = Modifier.size(20.dp),
+                            tint = Color(0xFF666666)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = message.subText,
+                            color = Color(0xFF555555),
+                            fontSize = 16.sp,
+                            lineHeight = 24.sp
+                        )
+                }
             }
-        }
-    }
-}
-
-@Composable
-fun UserBubble(text: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp, 4.dp, 16.dp, 16.dp))
-                .background(BubbleRight)
-                .padding(14.dp)
-                .widthIn(max = 280.dp)
-        ) {
-            Text(text, color = TextDark, fontSize = 17.sp, lineHeight = 24.sp)
         }
     }
 }

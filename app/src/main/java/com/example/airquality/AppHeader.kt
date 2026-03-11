@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
 import com.example.airquality.ui.theme.*
 
 /**
@@ -22,6 +23,8 @@ import com.example.airquality.ui.theme.*
 fun AppHeader(
     title: String,
     subtitle: String? = null,
+    centeredTitle: Boolean = true,
+    fontSize: androidx.compose.ui.unit.TextUnit = 18.sp,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     Column(
@@ -35,23 +38,29 @@ fun AppHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .height(68.dp)
+                .padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = if (centeredTitle) Alignment.CenterHorizontally else Alignment.Start
+            ) {
                 Text(
                     text = title,
-                    fontSize = 25.sp,
+                    fontSize = fontSize,
                     fontWeight = FontWeight.Bold,
-                    color = HeaderText
+                    color = HeaderText,
+                    textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start
                 )
                 if (subtitle != null) {
                     Text(
                         text = subtitle,
                         color = TextGray,
                         fontSize = 15.sp,
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = 2.dp),
+                        textAlign = if (centeredTitle) TextAlign.Center else TextAlign.Start
                     )
                 }
             }
@@ -85,9 +94,10 @@ fun HomeAppHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .height(68.dp)
+                .padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {

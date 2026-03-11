@@ -17,12 +17,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.airquality.ui.theme.*
 
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen() {
-    var isAsthma   by remember { mutableStateOf(true) }
-    var isHeart    by remember { mutableStateOf(false) }
-    var isPregnant by remember { mutableStateOf(false) }
-    var isAllergy  by remember { mutableStateOf(false) }
+    var selectedAgeGroup by remember { mutableStateOf("18-64歲") }
+    val ageGroups = listOf("18歲以下", "18-64歲", "65歲以上")
+    
+    val healthConditions = listOf("氣喘", "心血管疾病", "懷孕中", "過敏", "呼吸道疾病")
+    val selectedConditions = remember { mutableStateListOf<String>() }
     var otherText  by remember { mutableStateOf("") }
 
     val context = LocalContext.current
@@ -55,24 +57,62 @@ fun SettingsScreen() {
 
             Spacer(Modifier.height(20.dp))
 
-            // ── 健康敏感度 ─────────────────────────────────────
-            SettingSection("健康敏感度") {
+            // ── 個人健康檔案 ───────────────────────────────────────
+            SettingSection("個人健康檔案") {
                 Text(
-                    "AI 於你的偏好自動優化風險通知",
+                    "此資料將用於 AI (RAG) 分析，提供個人化健康建議",
                     color = TextGray, fontSize = 15.sp,
-                    modifier = Modifier.padding(bottom = 10.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
-                HealthCheckRow("氣喘",   isAsthma)   { isAsthma   = it }
-                HealthCheckRow("心臟病", isHeart)    { isHeart    = it }
-                HealthCheckRow("懷孕中", isPregnant) { isPregnant = it }
-                HealthCheckRow("過敏",   isAllergy)  { isAllergy  = it }
-                Spacer(Modifier.height(8.dp))
+                
+                Text("年齡層", color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(), 
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ageGroups.forEach { age ->
+                        FilterChip(
+                            selected = selectedAgeGroup == age,
+                            onClick = { selectedAgeGroup = age },
+                            label = { Text(age) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = OrangeMain.copy(alpha = 0.2f),
+                                selectedLabelColor = OrangeMain
+                            )
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Text("生理狀態與病史", color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    healthConditions.forEach { condition ->
+                        FilterChip(
+                            selected = selectedConditions.contains(condition),
+                            onClick = { 
+                                if (selectedConditions.contains(condition)) selectedConditions.remove(condition) 
+                                else selectedConditions.add(condition) 
+                            },
+                            label = { Text(condition) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = OrangeMain.copy(alpha = 0.2f),
+                                selectedLabelColor = OrangeMain
+                            )
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = otherText,
                     onValueChange = { otherText = it },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
-                    placeholder = { Text("其他（請說明）", color = TextGray, fontSize = 16.sp) },
+                    placeholder = { Text("其他說明（如長期服用藥物等）", color = TextGray, fontSize = 16.sp) },
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedContainerColor = BgMain,
                         focusedContainerColor   = BgMain,
@@ -155,21 +195,6 @@ fun SettingInfoRow(label: String, value: String) {
     }
 }
 
-@Composable
-fun HealthCheckRow(label: String, checked: Boolean, onCheck: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, color = TextDark, fontSize = 17.sp)
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onCheck,
-            colors = CheckboxDefaults.colors(checkedColor = OrangeMain)
-        )
-    }
-}
 
 @Composable
 fun SettingLinkRow(label: String) {
