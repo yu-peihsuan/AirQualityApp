@@ -42,6 +42,23 @@ data class WeatherResponse(
     val records: List<WeatherRecord> = emptyList()
 )
 
+data class NewsRecord(
+    val source: String,
+    val region: String,
+    val title: String,
+    val summary: String,
+    val url: String,
+    @SerializedName("published_at") val publishedAt: String,
+    val timestamp: String
+)
+
+data class NewsResponse(
+    val status: String,
+    val region: String?,
+    val message: String,
+    val records: List<NewsRecord> = emptyList()
+)
+
 // 定義 API 請求行為
 interface AirQualityApiService {
     @GET("api/air_quality")
@@ -49,6 +66,9 @@ interface AirQualityApiService {
 
     @GET("api/weather")
     suspend fun getWeather(@Query("county") county: String? = null): WeatherResponse
+
+    @GET("api/news")
+    suspend fun getNews(@Query("region") region: String? = null): NewsResponse
 }
 
 // 建立連線實體

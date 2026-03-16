@@ -20,9 +20,9 @@ import com.example.airquality.ui.theme.*
 fun ReportScreen() {
     val context = LocalContext.current
     val sharedPreferences = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
-    val defaultAddress = sharedPreferences.getString("default_address", "")?.takeIf { it.isNotEmpty() } ?: "臺北市中正區凱達格蘭大道1號"
+    val savedAddress = sharedPreferences.getString("default_address", "") ?: ""
     
-    var location    by remember { mutableStateOf(defaultAddress) }
+    var location    by remember { mutableStateOf(savedAddress) }
     var description by remember { mutableStateOf("") }
     var expanded    by remember { mutableStateOf(false) }
     var category    by remember { mutableStateOf("") }
@@ -118,7 +118,12 @@ fun ReportScreen() {
             // ── 按鈕列 ────────────────────────────────────────
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
-                    onClick = {},
+                    onClick = {
+                        location = savedAddress // Reset to user's saved address from settings
+                        description = ""
+                        category = ""
+                        expanded = false
+                    },
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) { Text("取消", color = TextMid) }
