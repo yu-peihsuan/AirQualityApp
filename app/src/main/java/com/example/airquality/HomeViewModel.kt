@@ -30,6 +30,13 @@ sealed class WeatherUiState {
     data class Error(val message: String) : WeatherUiState()
 }
 
+sealed class RagAdviceUiState {
+    object Idle : RagAdviceUiState()
+    object Loading : RagAdviceUiState()
+    data class Success(val response: RagAdviceResponse) : RagAdviceUiState()
+    data class Error(val message: String) : RagAdviceUiState()
+}
+
 class HomeViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<AqiUiState>(AqiUiState.Loading)
@@ -37,6 +44,9 @@ class HomeViewModel : ViewModel() {
 
     private val _weatherState = MutableStateFlow<WeatherUiState>(WeatherUiState.Loading)
     val weatherState: StateFlow<WeatherUiState> = _weatherState.asStateFlow()
+
+    private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
+    val ragAdviceState: StateFlow<RagAdviceUiState> = _ragAdviceState.asStateFlow()
 
     fun fetchAirQuality(context: Context?, address: String) {
         viewModelScope.launch {
@@ -79,6 +89,52 @@ class HomeViewModel : ViewModel() {
             } catch (e: Exception) {
                 _weatherState.value = WeatherUiState.Error("氣象資料取得失敗")
                 Log.e("HomeViewModel", "fetchWeatherForStation failed", e)
+            }
+        }
+    }
+
+    fun fetchRagAdvice(context: Context) {
+        viewModelScope.launch {
+            _ragAdviceState.value = RagAdviceUiState.Loading
+
+            try {
+                // 1. 從 SharedPreferences 讀取健康檔案
+                val healthPrefs = context.getSharedPreferences("health_profile", Context.MODE_PRIVATE)
+                val ageGroupRaw   = healthPrefs.getString("health_age_group", "18-64歲") ?: "18-64歲"
+                val conditionsRaw = healthPrefs.getString("health_conditions", "") ?: ""
+                val conditions    = conditionsRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
+                val ageGroup = when {
+                    ageGroupRaw.contains("18歲以下") -> "child"
+                    ageGroupRaw.contains("65")    -> "elderly"
+                    else                          -> "adult"
+                }
+
+                val userProfile = RagUserProfile(
+                    ageGroup        = ageGroup,
+                    isPregnant      = conditions.contains("懷孕中"),
+                    hasAsthma       = conditions.contains("氣喘") || conditions.contains("呼吸道疾病"),
+                    hasCardiovascular = conditions.contains("心血管疾病") || conditions.contains("高血壓"),
+                    hasAllergy      = conditions.contains("過敏")
+                )
+
+                // 2. 取得所在縣市（從 AQI 成功狀態取最近測站的縣市）
+                val county = when (val aqiState = _uiState.value) {
+                    is AqiUiState.Success -> aqiState.nearestRecord.county.ifBlank { "台北市" }
+                    else -> "台北市"
+                }
+
+                // 3. 呼叫 RAG API
+                val request = RagAdviceRequest(
+                    county      = county,
+                    userProfile = userProfile
+                )
+                val response = RetrofitClient.apiService.getRagAdvice(request)
+                _ragAdviceState.value = RagAdviceUiState.Success(response)
+
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "fetchRagAdvice failed", e)
+                _ragAdviceState.value = RagAdviceUiState.Error("AI 建議取得失敗: ${e.localizedMessage}")
             }
         }
     }
@@ -177,4 +233,4 @@ class HomeViewModel : ViewModel() {
             } catch (e: Exception) { Log.e("OSM_Geocoder", e.message ?: "") }
             null
         }
-}
+}
