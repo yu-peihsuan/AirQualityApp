@@ -118,15 +118,28 @@ class HomeViewModel : ViewModel() {
                     hasAllergy      = conditions.contains("過敏")
                 )
 
-                // 2. 取得所在縣市（從 AQI 成功狀態取最近測站的縣市）
-                val county = when (val aqiState = _uiState.value) {
-                    is AqiUiState.Success -> aqiState.nearestRecord.county.ifBlank { "台北市" }
-                    else -> "台北市"
+                // 2. 取得所在縣市與 AQI（從 AQI 成功狀態取最近測站，避免重複呼叫 API）
+                val county: String
+                val knownAqi: Int?
+                val knownPm25: Double?
+                when (val aqiState = _uiState.value) {
+                    is AqiUiState.Success -> {
+                        county    = aqiState.nearestRecord.county.ifBlank { "台北市" }
+                        knownAqi  = aqiState.nearestRecord.aqi.toIntOrNull()
+                        knownPm25 = aqiState.nearestRecord.pm25.toDoubleOrNull()
+                    }
+                    else -> {
+                        county    = "台北市"
+                        knownAqi  = null
+                        knownPm25 = null
+                    }
                 }
 
                 // 3. 呼叫 RAG API
                 val request = RagAdviceRequest(
                     county      = county,
+                    aqi         = knownAqi,
+                    pm25        = knownPm25,
                     userProfile = userProfile
                 )
                 val response = RetrofitClient.apiService.getRagAdvice(request)

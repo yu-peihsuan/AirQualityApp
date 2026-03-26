@@ -76,6 +76,8 @@ data class RagAdviceRequest(
     val county: String,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val aqi: Int? = null,
+    val pm25: Double? = null,
     @SerializedName("user_profile") val userProfile: RagUserProfile = RagUserProfile()
 )
 
