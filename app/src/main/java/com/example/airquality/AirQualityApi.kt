@@ -9,6 +9,8 @@ import retrofit2.http.Query
 
 import com.google.gson.annotations.SerializedName
 
+// ── 資料結構 ──────────────────────────────────────────────────────────────────
+
 data class AqiRecord(
     val sitename: String,
     val county: String,
@@ -20,7 +22,6 @@ data class AqiRecord(
     val publishtime: String? = null
 )
 
-// 定義從後端接收的資料結構 (對應你 Python 後端的格式)
 data class AirQualityResponse(
     val status: String,
     val county: String?,
@@ -77,7 +78,39 @@ data class ReportResponse(
     @SerializedName("is_confirmed") val isConfirmed: Boolean = false
 )
 
-// 定義 API 請求行為
+// ── RAG 建議 API 資料結構 ─────────────────────────────────────────────────────
+
+data class RagUserProfile(
+    @SerializedName("age_group")          val ageGroup: String = "adult",
+    @SerializedName("is_pregnant")        val isPregnant: Boolean = false,
+    @SerializedName("has_asthma")         val hasAsthma: Boolean = false,
+    @SerializedName("has_cardiovascular") val hasCardiovascular: Boolean = false,
+    @SerializedName("has_allergy")        val hasAllergy: Boolean = false
+)
+
+data class RagAdviceRequest(
+    val county: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val aqi: Int? = null,
+    val pm25: Double? = null,
+    @SerializedName("user_profile") val userProfile: RagUserProfile = RagUserProfile()
+)
+
+data class RagAdviceResponse(
+    val status: String,
+    val county: String?,
+    val aqi: Int?,
+    val pm25: Double?,
+    @SerializedName("aqi_level") val aqiLevel: String?,
+    val advice: String?,
+    @SerializedName("event_context") val eventContext: String?,
+    @SerializedName("retrieved_rules") val retrievedRules: List<String>?,
+    val message: String? = null
+)
+
+// ── API 介面 ─────────────────────────────────────────────────────────────────
+
 interface AirQualityApiService {
     @GET("api/air_quality")
     suspend fun getAirQuality(@Query("county") county: String? = null): AirQualityResponse
@@ -90,12 +123,16 @@ interface AirQualityApiService {
 
     @POST("api/report")
     suspend fun submitReport(@Body request: ReportRequest): ReportResponse
+
+    @POST("api/rag_advice")
+    suspend fun getRagAdvice(@Body request: RagAdviceRequest): RagAdviceResponse
 }
 
-// 建立連線實體
+// ── Retrofit 連線實體 ─────────────────────────────────────────────────────────
+
 object RetrofitClient {
     // 10.0.2.2 是 Android 模擬器連向本機電腦 (localhost) 的專用 IP
-    private const val BASE_URL = "http://10.0.2.2:8000/" 
+    private const val BASE_URL = "http://10.0.2.2:8000/"
 
     val apiService: AirQualityApiService by lazy {
         Retrofit.Builder()
