@@ -32,11 +32,16 @@ class NotificationViewModel : ViewModel() {
 
                 val regionParam = if (address.isNotBlank()) address else null
 
-                // 同時取得新聞與 AQI 資料
+                // 同時取得新聞、民眾回報與 AQI 資料
                 val newsResponse = RetrofitClient.apiService.getNews(regionParam)
+                val userReportsResponse = RetrofitClient.apiService.getUserReports()
                 val aqiResponse = RetrofitClient.apiService.getAirQuality(regionParam)
 
                 val newsRecords = (newsResponse.records ?: emptyList()).reversed().toMutableList()
+
+                // 民眾回報排在最上方
+                val userReports = (userReportsResponse.records ?: emptyList())
+                newsRecords.addAll(0, userReports)
 
                 // 若 AQI >= 151 (紅色警戒)，在最上方插入警報卡片
                 val aqiRecords = aqiResponse.records ?: emptyList()

@@ -121,6 +121,9 @@ interface AirQualityApiService {
     @GET("api/news")
     suspend fun getNews(@Query("region") region: String? = null): NewsResponse
 
+    @GET("api/user_reports")
+    suspend fun getUserReports(): NewsResponse
+
     @POST("api/report")
     suspend fun submitReport(@Body request: ReportRequest): ReportResponse
 
