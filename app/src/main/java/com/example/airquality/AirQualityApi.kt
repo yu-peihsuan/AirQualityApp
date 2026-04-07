@@ -2,7 +2,9 @@ package com.example.airquality
 
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 import com.google.gson.annotations.SerializedName
@@ -59,6 +61,22 @@ data class NewsResponse(
     val records: List<NewsRecord> = emptyList()
 )
 
+// ── 民眾回報 API 資料結構 ─────────────────────────────────────────────────────
+
+data class ReportRequest(
+    val location: String,
+    val category: String,
+    val description: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null
+)
+
+data class ReportResponse(
+    val status: String,
+    val message: String,
+    @SerializedName("is_confirmed") val isConfirmed: Boolean = false
+)
+
 // 定義 API 請求行為
 interface AirQualityApiService {
     @GET("api/air_quality")
@@ -69,6 +87,9 @@ interface AirQualityApiService {
 
     @GET("api/news")
     suspend fun getNews(@Query("region") region: String? = null): NewsResponse
+
+    @POST("api/report")
+    suspend fun submitReport(@Body request: ReportRequest): ReportResponse
 }
 
 // 建立連線實體
