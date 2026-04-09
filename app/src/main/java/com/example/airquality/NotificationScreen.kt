@@ -83,7 +83,7 @@ fun NotificationScreen(viewModel: NotificationViewModel = viewModel()) {
                                 tagColor = tagColor,
                                 time = news.publishedAt.take(16),
                                 title = news.title,
-                                body = news.region,
+                                body = news.summary.ifBlank { news.region },
                                 cardBg = cardBg
                             )
                             Spacer(Modifier.height(12.dp))
