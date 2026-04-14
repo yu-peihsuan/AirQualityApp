@@ -109,6 +109,18 @@ data class RagAdviceResponse(
     val message: String? = null
 )
 
+// ── FCM Token 註冊 資料結構 ───────────────────────────────────────────────────
+
+data class FcmTokenRequest(
+    val token: String,
+    val county: String = ""
+)
+
+data class FcmTokenResponse(
+    val status: String,
+    val message: String
+)
+
 // ── API 介面 ─────────────────────────────────────────────────────────────────
 
 interface AirQualityApiService {
@@ -129,6 +141,9 @@ interface AirQualityApiService {
 
     @POST("api/rag_advice")
     suspend fun getRagAdvice(@Body request: RagAdviceRequest): RagAdviceResponse
+
+    @POST("api/fcm/register")
+    suspend fun registerFcmToken(@Body request: FcmTokenRequest): FcmTokenResponse
 }
 
 // ── Retrofit 連線實體 ─────────────────────────────────────────────────────────

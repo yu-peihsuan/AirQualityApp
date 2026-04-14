@@ -1,1 +1,4 @@
 /build
+
+# Firebase 設定（含 API Key，不上傳）
+google-services.json
