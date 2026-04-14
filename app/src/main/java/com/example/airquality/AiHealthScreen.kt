@@ -34,9 +34,8 @@ fun AiHealthScreen(
 ) {
     val context = LocalContext.current
 
-    // 觀測 AQI 與天氣狀態
+    // 觀測 AQI 狀態（用來觸發 RAG 建議）
     val aqiState by homeViewModel.uiState.collectAsState()
-    val weatherState by homeViewModel.weatherState.collectAsState()
 
     // 觀測 RAG 建議狀態
     val ragAdviceState by homeViewModel.ragAdviceState.collectAsState()
@@ -65,30 +64,6 @@ fun AiHealthScreen(
         ) {
             Spacer(Modifier.height(20.dp))
 
-            // ── 環境數據概覽卡（舊有邏輯，保留） ──────────────────────────
-            if (aqiState is AqiUiState.Success && weatherState is WeatherUiState.Success) {
-                val aqiRecord = (aqiState as AqiUiState.Success).nearestRecord
-                val weatherRecord = (weatherState as WeatherUiState.Success).nearestRecord
-                val windDirString = homeViewModel.getWindDirectionString(
-                    weatherRecord.windDirection, weatherRecord.windSpeed
-                )
-                val isUnhealthy = aqiRecord.status.contains("不良") ||
-                        aqiRecord.status.contains("不佳") ||
-                        aqiRecord.status.contains("不健康") ||
-                        aqiRecord.status.contains("有害") ||
-                        aqiRecord.status.contains("危險") ||
-                        aqiRecord.status.contains("警告")
-
-                HealthAdviceCard(
-                    ChatMessage(
-                        text = "您附近的測站為${aqiRecord.sitename}測站，空氣品質為${aqiRecord.status}。" +
-                                "最近氣象測站為${weatherRecord.sitename}，風速${weatherRecord.windSpeed}，吹$windDirString",
-                        isWarning = isUnhealthy
-                    )
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-
             // ── AI 個人化建議卡 ───────────────────────────────────────────
             Text(
                 text = "AI 個人化建議",
@@ -113,15 +88,37 @@ fun AiHealthScreen(
                 // 成功
                 is RagAdviceUiState.Success -> {
                     val resp = state.response
-                    val hasEvent = resp.eventContext != null &&
-                            resp.eventContext.isNotBlank() &&
-                            resp.eventContext != "無"
-                    val isWarning = (resp.aqi ?: 0) > 100 || hasEvent
+                    val isWarning = (resp.aqi ?: 0) > 100 || resp.isDownwind == true
+
+                    // ── 下風處警告卡 ──────────────────────────────────────
+                    if (resp.isDownwind == true) {
+                        val src = resp.downwindSources?.firstOrNull()
+                        val typeLabel = when (src?.dominantType) {
+                            "fire"               -> "火災/濃煙"
+                            "chemical"           -> "化學異味"
+                            "dust"               -> "揚塵"
+                            "odor"               -> "異味"
+                            "vehicle"            -> "車輛廢氣"
+                            "factory"            -> "工廠排放"
+                            "general_air_quality"-> "空氣品質不良"
+                            else                 -> "污染源"
+                        }
+                        val distText = src?.let { "距離約 ${it.distanceKm} km" } ?: ""
+                        val windDirStr = resp.windDirection?.let {
+                            homeViewModel.getWindDirectionString(it.toString(), resp.windSpeed?.toString() ?: "0")
+                        } ?: ""
+
+                        DownwindWarningCard(
+                            typeLabel = typeLabel,
+                            distText  = distText,
+                            windDir   = windDirStr
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
 
                     HealthAdviceCard(
                         ChatMessage(
-                            text    = resp.advice ?: "目前無法取得建議，請稍後再試。",
-                            subText = if (hasEvent) "⚠️ 附近事件：${resp.eventContext}" else "",
+                            text      = resp.advice ?: "目前無法取得建議，請稍後再試。",
                             isWarning = isWarning
                         )
                     )
@@ -259,5 +256,41 @@ private fun RagPlaceholderCard(message: String) {
             color = Color(0xFF888888),
             lineHeight = 22.sp
         )
+    }
+}
+
+@Composable
+fun DownwindWarningCard(typeLabel: String, distText: String, windDir: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFFFFF3E0))
+            .padding(16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Warning,
+            contentDescription = "下風處警告",
+            tint = Color(0xFFE65100),
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(
+                text = "下風處警告",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFE65100)
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "您目前位於「$typeLabel」污染熱點的下風處${if (distText.isNotEmpty()) "（$distText）" else ""}。" +
+                       "${if (windDir.isNotEmpty()) "當前吹$windDir，" else ""}污染物可能隨風飄向您所在位置，請注意防護。",
+                fontSize = 14.sp,
+                color = Color(0xFF5D4037),
+                lineHeight = 21.sp
+            )
+        }
     }
 }

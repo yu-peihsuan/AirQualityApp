@@ -45,6 +45,11 @@ data class WeatherResponse(
     val records: List<WeatherRecord> = emptyList()
 )
 
+data class StructuredEvent(
+    @SerializedName("event_type") val eventType: String?,
+    val severity: String?
+)
+
 data class NewsRecord(
     val source: String,
     val region: String,
@@ -52,7 +57,12 @@ data class NewsRecord(
     val summary: String,
     val url: String,
     @SerializedName("published_at") val publishedAt: String,
-    val timestamp: String
+    val timestamp: String,
+    // 民眾回報專用欄位（爬蟲新聞不含，預設 null）
+    val category: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerializedName("structured_event") val structuredEvent: StructuredEvent? = null
 )
 
 data class NewsResponse(
@@ -97,16 +107,48 @@ data class RagAdviceRequest(
     @SerializedName("user_profile") val userProfile: RagUserProfile = RagUserProfile()
 )
 
+data class DownwindSource(
+    val lat: Double,
+    val lng: Double,
+    val count: Int,
+    val intensity: Double,
+    @SerializedName("radius_km")       val radiusKm: Double,
+    @SerializedName("dominant_type")   val dominantType: String,
+    @SerializedName("distance_km")     val distanceKm: Double,
+    @SerializedName("bearing_to_user") val bearingToUser: Double
+)
+
 data class RagAdviceResponse(
     val status: String,
     val county: String?,
     val aqi: Int?,
     val pm25: Double?,
-    @SerializedName("aqi_level") val aqiLevel: String?,
+    @SerializedName("wind_speed")       val windSpeed: Double?,
+    @SerializedName("wind_direction")   val windDirection: Double?,
+    @SerializedName("aqi_level")        val aqiLevel: String?,
     val advice: String?,
-    @SerializedName("event_context") val eventContext: String?,
-    @SerializedName("retrieved_rules") val retrievedRules: List<String>?,
+    @SerializedName("event_context")    val eventContext: String?,
+    @SerializedName("is_downwind")      val isDownwind: Boolean?,
+    @SerializedName("downwind_sources") val downwindSources: List<DownwindSource>?,
+    @SerializedName("retrieved_rules")  val retrievedRules: List<String>?,
     val message: String? = null
+)
+
+// ── GIS 熱點 資料結構 ─────────────────────────────────────────────────────────
+
+data class HotspotRecord(
+    val lat: Double,
+    val lng: Double,
+    val count: Int,
+    val intensity: Double,
+    @SerializedName("radius_km") val radiusKm: Double,
+    @SerializedName("dominant_type") val dominantType: String
+)
+
+data class HotspotResponse(
+    val status: String,
+    val count: Int,
+    val hotspots: List<HotspotRecord> = emptyList()
 )
 
 // ── API 介面 ─────────────────────────────────────────────────────────────────
@@ -124,11 +166,21 @@ interface AirQualityApiService {
     @GET("api/user_reports")
     suspend fun getUserReports(): NewsResponse
 
+    @GET("api/user_reports/history")
+    suspend fun getUserReportsHistory(): NewsResponse
+
     @POST("api/report")
     suspend fun submitReport(@Body request: ReportRequest): ReportResponse
 
     @POST("api/rag_advice")
     suspend fun getRagAdvice(@Body request: RagAdviceRequest): RagAdviceResponse
+
+    @GET("api/hotspots")
+    suspend fun getHotspots(
+        @Query("min_reports") minReports: Int = 2,
+        @Query("radius_km") radiusKm: Float = 1.5f,
+        @Query("top_n") topN: Int = 10
+    ): HotspotResponse
 }
 
 // ── Retrofit 連線實體 ─────────────────────────────────────────────────────────

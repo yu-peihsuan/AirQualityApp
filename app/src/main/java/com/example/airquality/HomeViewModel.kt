@@ -49,6 +49,10 @@ class HomeViewModel : ViewModel() {
     private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
     val ragAdviceState: StateFlow<RagAdviceUiState> = _ragAdviceState.asStateFlow()
 
+    // GPS 座標（由 fetchAirQualityByLocation 設定，供下風處判斷使用）
+    private var _userLat: Double? = null
+    private var _userLng: Double? = null
+
     fun fetchAirQuality(context: Context?, address: String) {
         viewModelScope.launch {
             _uiState.value = AqiUiState.Loading
@@ -119,6 +123,8 @@ class HomeViewModel : ViewModel() {
 
                 val nearestAqi = findNearestStation(aqiRecords, location.latitude, location.longitude)
                 _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, region)
+                _userLat = location.latitude
+                _userLng = location.longitude
                 fetchWeatherForStation(location.latitude, location.longitude)
 
             } catch (e: Exception) {
@@ -171,9 +177,11 @@ class HomeViewModel : ViewModel() {
                     }
                 }
 
-                // 3. 呼叫 RAG API
+                // 3. 呼叫 RAG API（附上 GPS 座標供下風處判斷）
                 val request = RagAdviceRequest(
                     county      = county,
+                    latitude    = _userLat,
+                    longitude   = _userLng,
                     aqi         = knownAqi,
                     pm25        = knownPm25,
                     userProfile = userProfile
