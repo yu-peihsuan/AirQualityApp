@@ -1,5 +1,9 @@
 package com.example.airquality
 
+import android.Manifest
+import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -7,9 +11,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import android.content.Context
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,25 +27,58 @@ fun ReportScreen(
     reportViewModel: ReportViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val sharedPreferences = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
-    val savedAddress = sharedPreferences.getString("default_address", "") ?: ""
 
-    var location    by remember { mutableStateOf(savedAddress) }
+    var location    by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var expanded    by remember { mutableStateOf(false) }
     var category    by remember { mutableStateOf("") }
     val categories  = listOf("工廠排放", "車輛廢氣", "露天燃燒", "建築揚塵", "火災煙霧", "其他")
 
     val uiState by reportViewModel.uiState.collectAsState()
+    val locationFetchState by reportViewModel.locationFetchState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = coroutineScope()
+
+    // 定位權限請求：允許後自動抓取 GPS 位置
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) reportViewModel.fetchAddressFromGps(context)
+    }
+
+    // 進入畫面時請求定位權限，已有權限則直接定位
+    LaunchedEffect(Unit) {
+        val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            reportViewModel.fetchAddressFromGps(context)
+        } else {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    // 定位完成 → 自動填入地址欄
+    LaunchedEffect(locationFetchState) {
+        when (val state = locationFetchState) {
+            is LocationFetchState.Success -> {
+                location = state.address
+                reportViewModel.resetLocationFetchState()
+            }
+            is LocationFetchState.Error -> {
+                scope.launch { snackbarHostState.showSnackbar(state.message) }
+                reportViewModel.resetLocationFetchState()
+            }
+            else -> {}
+        }
+    }
 
     // 回應成功/失敗 → 顯示 Snackbar
     LaunchedEffect(uiState) {
         when (val state = uiState) {
             is ReportUiState.Success -> {
                 scope.launch { snackbarHostState.showSnackbar(state.message) }
-                location = savedAddress
+                reportViewModel.fetchAddressFromGps(context)
                 description = ""
                 category = ""
                 reportViewModel.resetState()
@@ -61,7 +98,7 @@ fun ReportScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
                 .background(BgMain)
         ) {
             // ── Header ──────────────────────────────────────────────────────────
@@ -79,19 +116,45 @@ fun ReportScreen(
                 // ── 位置 ──────────────────────────────────────────
                 SectionLabel("位置")
                 Spacer(Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = CardWhite,
-                        focusedContainerColor   = CardWhite,
-                        unfocusedBorderColor    = DividerColor,
-                        focusedBorderColor      = OrangeMain,
-                    ),
-                    singleLine = true
-                )
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = location,
+                        onValueChange = { location = it },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        placeholder = { Text("輸入地址或點擊定位", color = TextGray) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = CardWhite,
+                            focusedContainerColor   = CardWhite,
+                            unfocusedBorderColor    = DividerColor,
+                            focusedBorderColor      = OrangeMain,
+                        ),
+                        singleLine = true
+                    )
+                    val isFetchingLocation = locationFetchState is LocationFetchState.Loading
+                    OutlinedButton(
+                        onClick = { reportViewModel.fetchAddressFromGps(context) },
+                        enabled = !isFetchingLocation,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(56.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeMain),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangeMain)
+                    ) {
+                        if (isFetchingLocation) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = OrangeMain,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("📍 定位", fontSize = 14.sp)
+                        }
+                    }
+                }
 
                 Spacer(Modifier.height(16.dp))
 
@@ -149,7 +212,7 @@ fun ReportScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = {
-                            location = savedAddress
+                            reportViewModel.fetchAddressFromGps(context)
                             description = ""
                             category = ""
                         },
@@ -159,7 +222,7 @@ fun ReportScreen(
                     ) { Text("取消", color = TextMid) }
 
                     Button(
-                        onClick = { reportViewModel.submitReport(location, category, description) },
+                        onClick = { reportViewModel.submitReport(context, location, category, description) },
                         enabled = !isLoading,
                         modifier = Modifier.weight(2f).height(50.dp),
                         shape = RoundedCornerShape(12.dp),

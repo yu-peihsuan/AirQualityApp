@@ -18,7 +18,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -29,9 +34,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalContext
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,8 +68,6 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val sharedPreferences = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
-    val defaultAddress = sharedPreferences.getString("default_address", "") ?: ""
 
     // 監聽來自 ViewModel 的狀態變化
     val uiState by viewModel.uiState.collectAsState()
@@ -70,19 +76,47 @@ fun HomeScreen(
     // 管理當前顯示的日期，讓它可以在回到畫面時更新
     var currentDateString by remember { mutableStateOf(getCurrentDateString()) }
 
+    // 權限請求 launcher：用戶允許後立即用 GPS 抓資料，拒絕則 fallback 地址
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                      permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            fetchWithGps(context, viewModel)
+        } else {
+            viewModel.fetchAirQuality(context, "台北市")
+        }
+    }
+
+    // 第一次進入 App 時，若尚未授權則發起權限請求
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
     // 當 lifecycle 狀態改變（回到前景 ON_RESUME）時更新日期並重新抓取空氣品質資料
-    DisposableEffect(lifecycleOwner, defaultAddress) {
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 currentDateString = getCurrentDateString()
-                viewModel.fetchAirQuality(context, defaultAddress)
+                fetchWithGps(context, viewModel)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        
+
         // 第一次進入時也主動抓取一次
         currentDateString = getCurrentDateString()
-        viewModel.fetchAirQuality(context, defaultAddress)
+        fetchWithGps(context, viewModel)
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -371,6 +405,35 @@ fun ActionChip(iconRes: Int, label: String, color: Color) {
         Spacer(Modifier.height(12.dp))
         Text(label, color = color, fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center) // 改為 AQI 文字顏色
     }
+}
+
+// GPS 定位優先，若無法取得則 fallback 預設地址
+@SuppressLint("MissingPermission")
+fun fetchWithGps(context: Context, viewModel: HomeViewModel) {
+    val hasPermission = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+
+    if (!hasPermission) {
+        viewModel.fetchAirQuality(context, "台北市")
+        return
+    }
+
+    val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+    val cts = CancellationTokenSource()
+    fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+        .addOnSuccessListener { location ->
+            if (location != null) {
+                viewModel.fetchAirQualityByLocation(context, location, "")
+            } else {
+                viewModel.fetchAirQuality(context, "台北市")
+            }
+        }
+        .addOnFailureListener {
+            viewModel.fetchAirQuality(context, "台北市")
+        }
 }
 
 //取得當下時間
