@@ -26,6 +26,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 取得 FCM Token 並儲存，供後端發送推播使用
+        TokenManager.fetchAndSaveToken(this)
         setContent {
             AirQualityTheme {
                 MainScreen()
