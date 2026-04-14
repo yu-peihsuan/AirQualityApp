@@ -16,7 +16,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -25,12 +24,18 @@ import androidx.compose.ui.unit.sp
 import com.example.airquality.ui.theme.*
 
 @Composable
-fun NotificationScreen(viewModel: NotificationViewModel = viewModel()) {
+fun NotificationScreen(
+    homeViewModel: HomeViewModel = viewModel(),
+    viewModel: NotificationViewModel = viewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    val homeUiState by homeViewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.fetchNotifications(context)
+    // 從 HomeViewModel 取得 GPS 定位到的縣市，作為新聞篩選條件
+    val county = (homeUiState as? AqiUiState.Success)?.nearestRecord?.county
+
+    LaunchedEffect(county) {
+        viewModel.fetchNotifications(county)
     }
 
     Column(

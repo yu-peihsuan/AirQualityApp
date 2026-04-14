@@ -1,6 +1,5 @@
 package com.example.airquality
 
-import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,18 +18,11 @@ class NotificationViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<NotificationUiState>(NotificationUiState.Loading)
     val uiState: StateFlow<NotificationUiState> = _uiState.asStateFlow()
 
-    fun fetchNotifications(context: Context?) {
+    fun fetchNotifications(county: String?) {
         viewModelScope.launch {
             _uiState.value = NotificationUiState.Loading
             try {
-                // 取得使用者地址
-                var address = ""
-                if (context != null) {
-                    val sharedPreferences = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-                    address = sharedPreferences.getString("default_address", "") ?: ""
-                }
-
-                val regionParam = if (address.isNotBlank()) address else null
+                val regionParam = county?.ifBlank { null }
 
                 // 同時取得新聞、民眾回報與 AQI 資料
                 val newsResponse = RetrofitClient.apiService.getNews(regionParam)

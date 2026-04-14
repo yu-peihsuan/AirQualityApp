@@ -2,6 +2,7 @@ package com.example.airquality
 
 import android.content.Context
 import android.location.Geocoder
+import android.location.Location
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -89,6 +90,41 @@ class HomeViewModel : ViewModel() {
             } catch (e: Exception) {
                 _weatherState.value = WeatherUiState.Error("氣象資料取得失敗")
                 Log.e("HomeViewModel", "fetchWeatherForStation failed", e)
+            }
+        }
+    }
+
+    fun fetchAirQualityByLocation(context: Context, location: Location, fallbackAddress: String) {
+        viewModelScope.launch {
+            _uiState.value = AqiUiState.Loading
+            _weatherState.value = WeatherUiState.Loading
+            try {
+                // 在 IO 執行緒做反向地理編碼，取得縣市名
+                val region = withContext(Dispatchers.IO) {
+                    try {
+                        val geocoder = Geocoder(context)
+                        @Suppress("DEPRECATION")
+                        val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                        addresses?.firstOrNull()?.let {
+                            (it.adminArea ?: "") + (it.subAdminArea ?: "")
+                        } ?: fallbackAddress.take(6).ifBlank { "目前位置" }
+                    } catch (e: Exception) {
+                        fallbackAddress.take(6).ifBlank { "目前位置" }
+                    }
+                }
+
+                val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
+                val aqiRecords = aqiResponse.records ?: emptyList()
+                if (aqiRecords.isEmpty()) throw Exception("沒有取得 AQI 資料")
+
+                val nearestAqi = findNearestStation(aqiRecords, location.latitude, location.longitude)
+                _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, region)
+                fetchWeatherForStation(location.latitude, location.longitude)
+
+            } catch (e: Exception) {
+                _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
+                _weatherState.value = WeatherUiState.Error("氣象資料取得失敗")
+                Log.e("HomeViewModel", "fetchAirQualityByLocation failed", e)
             }
         }
     }

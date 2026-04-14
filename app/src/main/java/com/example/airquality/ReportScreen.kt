@@ -27,10 +27,8 @@ fun ReportScreen(
     reportViewModel: ReportViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val sharedPreferences = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
-    val savedAddress = sharedPreferences.getString("default_address", "") ?: ""
 
-    var location    by remember { mutableStateOf(savedAddress) }
+    var location    by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var expanded    by remember { mutableStateOf(false) }
     var category    by remember { mutableStateOf("") }
@@ -41,14 +39,23 @@ fun ReportScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = coroutineScope()
 
-    // 定位權限請求
+    // 定位權限請求：允許後自動抓取 GPS 位置
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* 不論結果，提交時 ViewModel 會自行處理無權限的情況 */ }
+    ) { granted ->
+        if (granted) reportViewModel.fetchAddressFromGps(context)
+    }
 
-    // 進入畫面時請求定位權限
+    // 進入畫面時請求定位權限，已有權限則直接定位
     LaunchedEffect(Unit) {
-        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            reportViewModel.fetchAddressFromGps(context)
+        } else {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
     }
 
     // 定位完成 → 自動填入地址欄
@@ -71,7 +78,7 @@ fun ReportScreen(
         when (val state = uiState) {
             is ReportUiState.Success -> {
                 scope.launch { snackbarHostState.showSnackbar(state.message) }
-                location = savedAddress
+                reportViewModel.fetchAddressFromGps(context)
                 description = ""
                 category = ""
                 reportViewModel.resetState()
@@ -91,7 +98,7 @@ fun ReportScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
                 .background(BgMain)
         ) {
             // ── Header ──────────────────────────────────────────────────────────
@@ -205,7 +212,7 @@ fun ReportScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = {
-                            location = savedAddress
+                            reportViewModel.fetchAddressFromGps(context)
                             description = ""
                             category = ""
                         },

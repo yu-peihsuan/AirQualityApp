@@ -24,10 +24,6 @@ import kotlinx.coroutines.launch
 fun SettingsScreen() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("health_profile", Context.MODE_PRIVATE) }
-    val appPrefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
-
-    // ── 帳號管理 state ────────────────────────────────────────────────────
-    var defaultAddress by remember { mutableStateOf(appPrefs.getString("default_address", "") ?: "") }
 
     // ── 健康檔案 state（從 SharedPreferences 載入）────────────────────────
     val ageGroups       = listOf("18歲以下", "18-64歲", "65歲以上")
@@ -158,29 +154,6 @@ fun SettingsScreen() {
                     ) {
                         Text("儲存健康檔案", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                // ── 通報設定 ──────────────────────────────────────────────
-                SettingSection("通報設定") {
-                    Text(
-                        "設定後將自動帶入事件通報頁面",
-                        color = TextGray, fontSize = 13.sp,
-                        modifier = Modifier.padding(bottom = 10.dp)
-                    )
-                    OutlinedTextField(
-                        value = defaultAddress,
-                        onValueChange = {
-                            defaultAddress = it
-                            appPrefs.edit().putString("default_address", it).apply()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        placeholder = { Text("請輸入預設地址", color = TextGray, fontSize = 14.sp) },
-                        colors = healthTextFieldColors(),
-                        singleLine = true
-                    )
                 }
 
                 Spacer(Modifier.height(20.dp))
