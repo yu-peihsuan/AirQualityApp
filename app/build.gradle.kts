@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.gms.google-services")
 }
 
 val localProps = Properties().apply {
@@ -66,6 +67,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
     // GPS 定位 (FusedLocationProviderClient)
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    // Firebase Cloud Messaging (推播通知)
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
     // Google Maps (熱點地圖)
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.maps.android:maps-compose:4.3.3")

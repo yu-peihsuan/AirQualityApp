@@ -126,6 +126,8 @@ class HomeViewModel : ViewModel() {
                 _userLat = location.latitude
                 _userLng = location.longitude
                 fetchWeatherForStation(location.latitude, location.longitude)
+                // GPS 縣市確認後，上傳 FCM Token 給後端
+                TokenManager.uploadTokenWithCounty(context, nearestAqi.county)
 
             } catch (e: Exception) {
                 _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
