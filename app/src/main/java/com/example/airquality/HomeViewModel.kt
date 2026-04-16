@@ -1,7 +1,6 @@
 package com.example.airquality
 
 import android.content.Context
-import android.location.Geocoder
 import android.location.Location
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -10,7 +9,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.json.JSONArray
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.*
@@ -103,19 +102,9 @@ class HomeViewModel : ViewModel() {
             _uiState.value = AqiUiState.Loading
             _weatherState.value = WeatherUiState.Loading
             try {
-                // 在 IO 執行緒做反向地理編碼，取得縣市名
-                val region = withContext(Dispatchers.IO) {
-                    try {
-                        val geocoder = Geocoder(context)
-                        @Suppress("DEPRECATION")
-                        val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                        addresses?.firstOrNull()?.let {
-                            (it.adminArea ?: "") + (it.subAdminArea ?: "")
-                        } ?: fallbackAddress.take(6).ifBlank { "目前位置" }
-                    } catch (e: Exception) {
-                        fallbackAddress.take(6).ifBlank { "目前位置" }
-                    }
-                }
+                // 使用 Google Maps Geocoding API 反向地理編碼，取得縣市名
+                val region = googleReverseGeocodeCounty(location.latitude, location.longitude)
+                    ?: fallbackAddress.take(6).ifBlank { "目前位置" }
 
                 val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
                 val aqiRecords = aqiResponse.records ?: emptyList()
@@ -241,55 +230,73 @@ class HomeViewModel : ViewModel() {
         return R * c
     }
 
-    // 統一取得經緯度
+    // 統一取得經緯度（正向地理編碼：地址 → 座標）
     private suspend fun getCoordinates(context: Context?, address: String): Triple<Double, Double, String> {
         var lat = 25.032969
         var lng = 121.516039
         var region = "臺北市中正區"
 
-        if (context != null && address.isNotBlank()) {
-            val result = try { geocode(context, address) } catch (e: Exception) { null }
-            val fallback = result ?: getCoordinatesFromOSM(address)
-
-            if (fallback != null) {
-                lat = fallback.first
-                lng = fallback.second
+        if (address.isNotBlank()) {
+            val result = googleForwardGeocode(address)
+            if (result != null) {
+                lat = result.first
+                lng = result.second
                 region = address.take(6)
             }
         }
         return Triple(lat, lng, region)
     }
 
-    private suspend fun geocode(context: Context, address: String): Pair<Double, Double>? =
-        withContext(Dispatchers.IO) {
-            val geocoder = Geocoder(context)
-            val addresses = @Suppress("DEPRECATION") geocoder.getFromLocationName(address, 1)
-            if (!addresses.isNullOrEmpty()) {
-                val addr = addresses[0]
-                return@withContext Pair(addr.latitude, addr.longitude)
-            }
-            null
-        }
-
-    private suspend fun getCoordinatesFromOSM(address: String): Pair<Double, Double>? =
+    // Google Maps Geocoding API：正向地理編碼（地址 → 座標）
+    private suspend fun googleForwardGeocode(address: String): Pair<Double, Double>? =
         withContext(Dispatchers.IO) {
             try {
                 val encoded = java.net.URLEncoder.encode(address, "UTF-8")
-                val url = URL("https://nominatim.openstreetmap.org/search?q=$encoded&format=json&limit=1")
+                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=${BuildConfig.MAPS_API_KEY}&language=zh-TW")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
-                conn.setRequestProperty("User-Agent", "AirQualityApp/1.0")
                 if (conn.responseCode == 200) {
-                    val response = conn.inputStream.bufferedReader().use { it.readText() }
-                    val arr = JSONArray(response)
-                    if (arr.length() > 0) {
-                        val obj = arr.getJSONObject(0)
-                        val lat = obj.getString("lat").toDoubleOrNull()
-                        val lon = obj.getString("lon").toDoubleOrNull()
-                        if (lat != null && lon != null) return@withContext Pair(lat, lon)
+                    val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                    if (json.getString("status") == "OK") {
+                        val location = json.getJSONArray("results")
+                            .getJSONObject(0)
+                            .getJSONObject("geometry")
+                            .getJSONObject("location")
+                        return@withContext Pair(location.getDouble("lat"), location.getDouble("lng"))
                     }
                 }
-            } catch (e: Exception) { Log.e("OSM_Geocoder", e.message ?: "") }
+            } catch (e: Exception) { Log.e("GoogleGeocoder", e.message ?: "") }
+            null
+        }
+
+    // Google Maps Geocoding API：反向地理編碼（座標 → 縣市名）
+    private suspend fun googleReverseGeocodeCounty(lat: Double, lng: Double): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=${BuildConfig.MAPS_API_KEY}&language=zh-TW")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "GET"
+                if (conn.responseCode == 200) {
+                    val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                    if (json.getString("status") == "OK") {
+                        val components = json.getJSONArray("results")
+                            .getJSONObject(0)
+                            .getJSONArray("address_components")
+                        var adminArea = ""
+                        var subAdminArea = ""
+                        for (i in 0 until components.length()) {
+                            val comp = components.getJSONObject(i)
+                            val types = comp.getJSONArray("types")
+                            val typeList = (0 until types.length()).map { types.getString(it) }
+                            when {
+                                "administrative_area_level_1" in typeList -> adminArea = comp.getString("long_name")
+                                "administrative_area_level_2" in typeList -> subAdminArea = comp.getString("long_name")
+                            }
+                        }
+                        return@withContext (adminArea + subAdminArea).ifBlank { null }
+                    }
+                }
+            } catch (e: Exception) { Log.e("GoogleGeocoder", e.message ?: "") }
             null
         }
 }

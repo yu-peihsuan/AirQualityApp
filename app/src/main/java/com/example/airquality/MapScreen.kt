@@ -52,7 +52,7 @@ class MapViewModel : ViewModel() {
             _uiState.value = MapUiState.Loading
             try {
                 val hotspotsDeferred = async { RetrofitClient.apiService.getHotspots() }
-                val reportsDeferred  = async { RetrofitClient.apiService.getUserReportsHistory() }
+                val reportsDeferred  = async { RetrofitClient.apiService.getUserReports() }
 
                 val hotspots = hotspotsDeferred.await().hotspots
                 val reports  = reportsDeferred.await().records.filter {

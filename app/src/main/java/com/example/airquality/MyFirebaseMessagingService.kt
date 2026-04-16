@@ -19,8 +19,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     override fun onNewToken(token: String) {
-        // Token 更新時上傳至後端
+        // Token 更新時存本機並立即上傳至後端
         TokenManager.saveToken(applicationContext, token)
+        TokenManager.uploadTokenWithCounty(applicationContext, "")
     }
 
     private fun showNotification(title: String, body: String) {
