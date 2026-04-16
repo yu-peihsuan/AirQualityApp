@@ -1,5 +1,7 @@
 package com.example.airquality
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,20 +15,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import com.example.airquality.ui.theme.*
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -35,7 +44,8 @@ sealed class MapUiState {
     object Loading : MapUiState()
     data class Success(
         val hotspots: List<HotspotRecord>,
-        val reports: List<NewsRecord>      // 含 lat/lng 的個別回報
+        val reports: List<NewsRecord>,
+        val userLocation: LatLng?
     ) : MapUiState()
     data class Error(val message: String) : MapUiState()
 }
@@ -47,25 +57,41 @@ class MapViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
-    fun fetchMapData() {
+    @SuppressLint("MissingPermission")
+    fun fetchMapData(context: Context) {
         viewModelScope.launch {
             _uiState.value = MapUiState.Loading
             try {
                 val hotspotsDeferred = async { RetrofitClient.apiService.getHotspots() }
                 val reportsDeferred  = async { RetrofitClient.apiService.getUserReports() }
+                val locationDeferred = async { getCurrentLocation(context) }
 
-                val hotspots = hotspotsDeferred.await().hotspots
-                val reports  = reportsDeferred.await().records.filter {
+                val hotspots     = hotspotsDeferred.await().hotspots
+                val reports      = reportsDeferred.await().records.filter {
                     it.latitude != null && it.longitude != null
                 }
+                val userLocation = locationDeferred.await()
 
-                _uiState.value = MapUiState.Success(hotspots, reports)
+                _uiState.value = MapUiState.Success(hotspots, reports, userLocation)
             } catch (e: Exception) {
                 Log.e("MapViewModel", "fetchMapData failed", e)
                 _uiState.value = MapUiState.Error("地圖資料取得失敗")
             }
         }
     }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun getCurrentLocation(context: Context): LatLng? =
+        suspendCancellableCoroutine { cont ->
+            val client = LocationServices.getFusedLocationProviderClient(context)
+            val cts = CancellationTokenSource()
+            client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+                .addOnSuccessListener { loc ->
+                    cont.resume(if (loc != null) LatLng(loc.latitude, loc.longitude) else null)
+                }
+                .addOnFailureListener { cont.resume(null) }
+            cont.invokeOnCancellation { cts.cancel() }
+        }
 }
 
 // ── 工具：事件類型轉中文 ──────────────────────────────────────────────────────
@@ -100,12 +126,25 @@ fun MapScreen(
     viewModel: MapViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
-    LaunchedEffect(Unit) { viewModel.fetchMapData() }
+    LaunchedEffect(Unit) { viewModel.fetchMapData(context) }
 
     val taiwan = LatLng(23.6978, 120.9605)
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(taiwan, 7f)
+    }
+
+    // 取得使用者位置後聚焦鏡頭
+    LaunchedEffect(uiState) {
+        if (uiState is MapUiState.Success) {
+            val loc = (uiState as MapUiState.Success).userLocation
+            if (loc != null) {
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngZoom(loc, 13f)
+                )
+            }
+        }
     }
 
     Column(
@@ -134,7 +173,9 @@ fun MapScreen(
             // ── 地圖本體 ──────────────────────────────────────────────────────
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(isMyLocationEnabled = true),
+                uiSettings = MapUiSettings(myLocationButtonEnabled = true)
             ) {
                 if (uiState is MapUiState.Success) {
                     val data = uiState as MapUiState.Success
