@@ -153,8 +153,11 @@ data class HotspotRecord(
     val lng: Double,
     val count: Int,
     val intensity: Double,
-    @SerializedName("radius_km") val radiusKm: Double,
-    @SerializedName("dominant_type") val dominantType: String
+    @SerializedName("radius_km")       val radiusKm: Double,
+    @SerializedName("dominant_type")   val dominantType: String,
+    @SerializedName("is_calm_wind")    val isCalmWind: Boolean = false,
+    @SerializedName("wind_speed")      val windSpeed: Double = 0.0,
+    @SerializedName("wind_direction")  val windDirection: Double = 0.0,
 )
 
 data class HotspotResponse(

@@ -42,6 +42,10 @@ class ReportViewModel : ViewModel() {
     private val _locationFetchState = MutableStateFlow<LocationFetchState>(LocationFetchState.Idle)
     val locationFetchState: StateFlow<LocationFetchState> = _locationFetchState.asStateFlow()
 
+    // 快取 GPS 定位結果，用於判斷使用者是否修改過地址
+    private var cachedGpsCoords: Pair<Double, Double>? = null
+    private var cachedGpsAddress: String? = null
+
     /** 使用者點「定位」按鈕 → 取得 GPS 並 Reverse Geocoding 轉為地址。 */
     fun fetchAddressFromGps(context: Context) {
         viewModelScope.launch {
@@ -53,6 +57,8 @@ class ReportViewModel : ViewModel() {
             }
             val address = reverseGeocode(coords.first, coords.second)
             if (address != null) {
+                cachedGpsCoords = coords
+                cachedGpsAddress = address
                 _locationFetchState.value = LocationFetchState.Success(address)
             } else {
                 _locationFetchState.value = LocationFetchState.Error("無法解析地址，請手動輸入")
@@ -72,7 +78,12 @@ class ReportViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = ReportUiState.Loading
             try {
-                val coords = getCurrentLocation(context)
+                // 地址與 GPS 快取相符 → 直接用 GPS 座標；否則正向地理編碼取得座標
+                val coords = if (location.trim() == cachedGpsAddress?.trim()) {
+                    cachedGpsCoords
+                } else {
+                    forwardGeocode(location)
+                }
                 val response = RetrofitClient.apiService.submitReport(
                     ReportRequest(
                         location = location,
@@ -104,6 +115,28 @@ class ReportViewModel : ViewModel() {
                     cont.resume(null)
                 }
             cont.invokeOnCancellation { cts.cancel() }
+        }
+
+    /** Google Maps Geocoding API：正向地理編碼（地址文字 → 座標）。 */
+    private suspend fun forwardGeocode(address: String): Pair<Double, Double>? =
+        withContext(Dispatchers.IO) {
+            try {
+                val encoded = java.net.URLEncoder.encode(address, "UTF-8")
+                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=${BuildConfig.MAPS_API_KEY}&language=zh-TW")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "GET"
+                if (conn.responseCode == 200) {
+                    val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                    if (json.getString("status") == "OK") {
+                        val loc = json.getJSONArray("results")
+                            .getJSONObject(0)
+                            .getJSONObject("geometry")
+                            .getJSONObject("location")
+                        return@withContext Pair(loc.getDouble("lat"), loc.getDouble("lng"))
+                    }
+                }
+            } catch (e: Exception) { Log.e("GoogleGeocoder", e.message ?: "") }
+            null
         }
 
     /** Google Maps Geocoding API：反向地理編碼（座標 → 可讀地址）。 */

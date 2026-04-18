@@ -206,23 +206,30 @@ fun MapScreen(
                             else                     -> Color(0xFFFFCC00)
                         }
                         val typeLabel = eventTypeLabel(hotspot.dominantType)
+                        val windInfo = if (hotspot.isCalmWind) {
+                            "⚠ 擴散條件差（近乎無風）"
+                        } else {
+                            val dir = windDirectionLabel(hotspot.windDirection)
+                            "風向：$dir  風速：${hotspot.windSpeed} m/s"
+                        }
 
-                        // 警戒範圍圓
+                        // 警戒範圍圓：無風時用灰紫色
+                        val circleColor = if (hotspot.isCalmWind) Color(0xFF6A1B9A) else markerColor
                         Circle(
                             center      = LatLng(hotspot.lat, hotspot.lng),
                             radius      = hotspot.radiusKm * 1000.0,
-                            fillColor   = markerColor.copy(alpha = 0.18f),
-                            strokeColor = markerColor.copy(alpha = 0.80f),
-                            strokeWidth = 2.5f
+                            fillColor   = circleColor.copy(alpha = 0.18f),
+                            strokeColor = circleColor.copy(alpha = 0.80f),
+                            strokeWidth = if (hotspot.isCalmWind) 3.5f else 2.5f
                         )
 
                         // 叢集中心標記
                         MarkerComposable(
                             state   = MarkerState(position = LatLng(hotspot.lat, hotspot.lng)),
                             title   = "$typeLabel（${hotspot.count} 筆回報）",
-                            snippet = "強度：${(hotspot.intensity * 100).toInt()}%  警戒範圍：${hotspot.radiusKm} km",
+                            snippet = "強度：${(hotspot.intensity * 100).toInt()}%  範圍：${hotspot.radiusKm} km｜$windInfo",
                         ) {
-                            HotspotMarker(count = hotspot.count, color = markerColor)
+                            HotspotMarker(count = hotspot.count, color = markerColor, isCalmWind = hotspot.isCalmWind)
                         }
                     }
                 }
@@ -289,6 +296,7 @@ fun MapScreen(
                             LegendItem(Color(0xFFE53935), "高強度 ≥ 80%", circle = true)
                             LegendItem(Color(0xFFFF6600), "中強度 ≥ 50%", circle = true)
                             LegendItem(Color(0xFFFFCC00), "低強度 < 50%", circle = true)
+                            LegendItem(Color(0xFF6A1B9A), "擴散條件差（無風）", circle = true)
                         }
                         if (data.reports.isNotEmpty()) {
                             Spacer(Modifier.height(2.dp))
@@ -304,6 +312,13 @@ fun MapScreen(
             }
         }
     }
+}
+
+// ── 風向角度轉中文方位 ─────────────────────────────────────────────────────────
+
+private fun windDirectionLabel(deg: Double): String = when ((deg + 22.5).toInt() / 45 % 8) {
+    0 -> "北"; 1 -> "東北"; 2 -> "東"; 3 -> "東南"
+    4 -> "南"; 5 -> "西南"; 6 -> "西"; else -> "西北"
 }
 
 // ── 個別回報小 Pin ─────────────────────────────────────────────────────────────
@@ -329,27 +344,41 @@ fun ReportPin(color: Color) {
 // ── 熱點叢集標記 ──────────────────────────────────────────────────────────────
 
 @Composable
-fun HotspotMarker(count: Int, color: Color) {
-    Box(contentAlignment = Alignment.Center) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(color.copy(alpha = 0.25f))
-        )
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(color),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = count.toString(),
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
+fun HotspotMarker(count: Int, color: Color, isCalmWind: Boolean = false) {
+    Box(contentAlignment = Alignment.TopEnd) {
+        Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.25f))
             )
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = count.toString(),
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        // 無風擴散條件差：右上角顯示警示標誌
+        if (isCalmWind) {
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF6A1B9A)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("!", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
