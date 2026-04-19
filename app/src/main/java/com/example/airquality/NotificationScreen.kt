@@ -11,10 +11,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +34,7 @@ fun NotificationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val homeUiState by homeViewModel.uiState.collectAsState()
+    var showMap by remember { mutableStateOf(false) }
 
     // 從 HomeViewModel 取得 GPS 定位到的縣市，作為新聞篩選條件
     val county = (homeUiState as? AqiUiState.Success)?.nearestRecord?.county
@@ -38,13 +43,31 @@ fun NotificationScreen(
         viewModel.fetchNotifications(county)
     }
 
+    // 顯示地圖畫面
+    if (showMap) {
+        MapScreen(onBack = { showMap = false })
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgMain)
     ) {
         // ── Header ──────────────────────────────────────────────────────────
-        AppHeader(title = "通知中心")
+        AppHeader(
+            title = "通知中心",
+            actions = {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.location),
+                    contentDescription = "熱點地圖",
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clickable { showMap = true },
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(OrangeMain)
+                )
+            }
+        )
 
         // ── 主內容 (scrollable) ─────────────────────────────────────────────
         when (uiState) {
