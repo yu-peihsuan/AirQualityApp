@@ -45,6 +45,7 @@ sealed class MapUiState {
     data class Success(
         val hotspots: List<HotspotRecord>,
         val reports: List<NewsRecord>,
+        val newsEvents: List<NewsRecord>,
         val userLocation: LatLng?
     ) : MapUiState()
     data class Error(val message: String) : MapUiState()
@@ -62,17 +63,22 @@ class MapViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = MapUiState.Loading
             try {
-                val hotspotsDeferred = async { RetrofitClient.apiService.getHotspots() }
-                val reportsDeferred  = async { RetrofitClient.apiService.getUserReports() }
-                val locationDeferred = async { getCurrentLocation(context) }
+                val hotspotsDeferred    = async { RetrofitClient.apiService.getHotspots() }
+                val reportsDeferred     = async { RetrofitClient.apiService.getUserReports() }
+                val newsDeferred        = async { RetrofitClient.apiService.getNews() }
+                val locationDeferred    = async { getCurrentLocation(context) }
 
                 val hotspots     = hotspotsDeferred.await().hotspots
                 val reports      = reportsDeferred.await().records.filter {
                     it.latitude != null && it.longitude != null
                 }
+                // 只顯示有座標的新聞確認事件
+                val newsEvents   = newsDeferred.await().records.filter {
+                    it.latitude != null && it.longitude != null
+                }
                 val userLocation = locationDeferred.await()
 
-                _uiState.value = MapUiState.Success(hotspots, reports, userLocation)
+                _uiState.value = MapUiState.Success(hotspots, reports, newsEvents, userLocation)
             } catch (e: Exception) {
                 Log.e("MapViewModel", "fetchMapData failed", e)
                 _uiState.value = MapUiState.Error("地圖資料取得失敗")
@@ -180,7 +186,25 @@ fun MapScreen(
                 if (uiState is MapUiState.Success) {
                     val data = uiState as MapUiState.Success
 
-                    // ── 層1：個別回報 pin ─────────────────────────────────────
+                    // ── 層1：新聞確認事件 pin ─────────────────────────────────
+                    data.newsEvents.forEach { news ->
+                        val lat = news.latitude ?: return@forEach
+                        val lng = news.longitude ?: return@forEach
+                        val evType  = news.structuredEvent?.eventType
+                        val color   = reportColor(evType)
+                        val label   = eventTypeLabel(evType ?: news.category)
+                        val snippet = news.title.take(40)
+
+                        MarkerComposable(
+                            state   = MarkerState(position = LatLng(lat, lng)),
+                            title   = "📰 $label",
+                            snippet = snippet,
+                        ) {
+                            NewsEventPin(color = color)
+                        }
+                    }
+
+                    // ── 層2：個別回報 pin ─────────────────────────────────────
                     data.reports.forEach { report ->
                         val lat = report.latitude ?: return@forEach
                         val lng = report.longitude ?: return@forEach
@@ -262,7 +286,7 @@ fun MapScreen(
             // ── 無任何資料提示（熱點＆回報都空才顯示） ───────────────────────
             if (uiState is MapUiState.Success) {
                 val data = uiState as MapUiState.Success
-                if (data.hotspots.isEmpty() && data.reports.isEmpty()) {
+                if (data.hotspots.isEmpty() && data.reports.isEmpty() && data.newsEvents.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -279,7 +303,7 @@ fun MapScreen(
             // ── 圖例 ──────────────────────────────────────────────────────────
             if (uiState is MapUiState.Success) {
                 val data = uiState as MapUiState.Success
-                if (data.hotspots.isNotEmpty() || data.reports.isNotEmpty()) {
+                if (data.hotspots.isNotEmpty() || data.reports.isNotEmpty() || data.newsEvents.isNotEmpty()) {
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -297,6 +321,12 @@ fun MapScreen(
                             LegendItem(Color(0xFFFF6600), "中強度 ≥ 50%", circle = true)
                             LegendItem(Color(0xFFFFCC00), "低強度 < 50%", circle = true)
                             LegendItem(Color(0xFF6A1B9A), "擴散條件差（無風）", circle = true)
+                        }
+                        if (data.newsEvents.isNotEmpty()) {
+                            Spacer(Modifier.height(2.dp))
+                            Text("— 新聞確認事件", fontSize = 10.sp, color = TextGray)
+                            LegendItem(Color(0xFFE53935), "火災/濃煙", circle = false, isNews = true)
+                            LegendItem(Color(0xFF8E24AA), "化學/異味", circle = false, isNews = true)
                         }
                         if (data.reports.isNotEmpty()) {
                             Spacer(Modifier.height(2.dp))
@@ -319,6 +349,29 @@ fun MapScreen(
 private fun windDirectionLabel(deg: Double): String = when ((deg + 22.5).toInt() / 45 % 8) {
     0 -> "北"; 1 -> "東北"; 2 -> "東"; 3 -> "東南"
     4 -> "南"; 5 -> "西南"; 6 -> "西"; else -> "西北"
+}
+
+// ── 新聞確認事件 Pin（菱形外框區別民眾回報）────────────────────────────────────
+
+@Composable
+fun NewsEventPin(color: Color) {
+    Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.20f))
+        )
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(color),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("📰", fontSize = 10.sp)
+        }
+    }
 }
 
 // ── 個別回報小 Pin ─────────────────────────────────────────────────────────────
@@ -386,23 +439,20 @@ fun HotspotMarker(count: Int, color: Color, isCalmWind: Boolean = false) {
 // ── 圖例列 ────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun LegendItem(color: Color, label: String, circle: Boolean) {
+private fun LegendItem(color: Color, label: String, circle: Boolean, isNews: Boolean = false) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        if (circle) {
-            // 叢集：實心圓
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(color)
+        when {
+            circle -> Box(
+                modifier = Modifier.size(10.dp).clip(CircleShape).background(color)
             )
-        } else {
-            // 個別回報：小實心圓（區分叢集圖例）
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(color)
+            isNews -> Box(
+                modifier = Modifier.size(10.dp).clip(CircleShape).background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("📰", fontSize = 6.sp)
+            }
+            else -> Box(
+                modifier = Modifier.size(8.dp).clip(CircleShape).background(color)
             )
         }
         Spacer(Modifier.width(6.dp))
