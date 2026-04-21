@@ -26,7 +26,7 @@ class NotificationViewModel : ViewModel() {
 
                 // 同時取得新聞、民眾回報與 AQI 資料
                 val newsResponse = RetrofitClient.apiService.getNews(regionParam)
-                val userReportsResponse = RetrofitClient.apiService.getUserReports()
+                val userReportsResponse = RetrofitClient.apiService.getUserReports(regionParam)
                 val aqiResponse = RetrofitClient.apiService.getAirQuality(regionParam)
 
                 val newsRecords = (newsResponse.records ?: emptyList()).reversed().toMutableList()

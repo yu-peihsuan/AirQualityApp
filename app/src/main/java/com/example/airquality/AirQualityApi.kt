@@ -179,7 +179,7 @@ interface AirQualityApiService {
     suspend fun getNews(@Query("region") region: String? = null): NewsResponse
 
     @GET("api/user_reports")
-    suspend fun getUserReports(): NewsResponse
+    suspend fun getUserReports(@Query("region") region: String? = null): NewsResponse
 
     @GET("api/user_reports/history")
     suspend fun getUserReportsHistory(): NewsResponse
