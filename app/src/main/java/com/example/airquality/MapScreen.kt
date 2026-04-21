@@ -304,6 +304,7 @@ fun MapScreen(
             if (uiState is MapUiState.Success) {
                 val data = uiState as MapUiState.Success
                 if (data.hotspots.isNotEmpty() || data.reports.isNotEmpty() || data.newsEvents.isNotEmpty()) {
+                    var legendExpanded by remember { mutableStateOf(false) }
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -313,29 +314,42 @@ fun MapScreen(
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text("圖例", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
-                        if (data.hotspots.isNotEmpty()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text("— 熱點叢集", fontSize = 10.sp, color = TextGray)
-                            LegendItem(Color(0xFFE53935), "高強度 ≥ 80%", circle = true)
-                            LegendItem(Color(0xFFFF6600), "中強度 ≥ 50%", circle = true)
-                            LegendItem(Color(0xFFFFCC00), "低強度 < 50%", circle = true)
-                            LegendItem(Color(0xFF6A1B9A), "擴散條件差（無風）", circle = true)
+                        Row(
+                            modifier = Modifier.clickable { legendExpanded = !legendExpanded },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("圖例", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                            Text(
+                                if (legendExpanded) "▲" else "▼",
+                                fontSize = 9.sp,
+                                color = TextGray
+                            )
                         }
-                        if (data.newsEvents.isNotEmpty()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text("— 新聞確認事件", fontSize = 10.sp, color = TextGray)
-                            LegendItem(Color(0xFFE53935), "火災/濃煙", circle = false, isNews = true)
-                            LegendItem(Color(0xFF8E24AA), "化學/異味", circle = false, isNews = true)
-                        }
-                        if (data.reports.isNotEmpty()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text("— 個別回報", fontSize = 10.sp, color = TextGray)
-                            LegendItem(Color(0xFFE53935), "火災/濃煙",   circle = false)
-                            LegendItem(Color(0xFF8E24AA), "化學異味",    circle = false)
-                            LegendItem(Color(0xFFFF8F00), "揚塵",        circle = false)
-                            LegendItem(Color(0xFF00897B), "異味",        circle = false)
-                            LegendItem(Color(0xFF546E7A), "車輛/工廠",   circle = false)
+                        if (legendExpanded) {
+                            if (data.hotspots.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text("— 熱點叢集", fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFE53935), "高強度 ≥ 80%", circle = true)
+                                LegendItem(Color(0xFFFF6600), "中強度 ≥ 50%", circle = true)
+                                LegendItem(Color(0xFFFFCC00), "低強度 < 50%", circle = true)
+                                LegendItem(Color(0xFF6A1B9A), "擴散條件差（無風）", circle = true)
+                            }
+                            if (data.newsEvents.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text("— 新聞確認事件", fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFE53935), "火災/濃煙", circle = false, isNews = true)
+                                LegendItem(Color(0xFF8E24AA), "化學/異味", circle = false, isNews = true)
+                            }
+                            if (data.reports.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text("— 個別回報", fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFE53935), "火災/濃煙",   circle = false)
+                                LegendItem(Color(0xFF8E24AA), "化學異味",    circle = false)
+                                LegendItem(Color(0xFFFF8F00), "揚塵",        circle = false)
+                                LegendItem(Color(0xFF00897B), "異味",        circle = false)
+                                LegendItem(Color(0xFF546E7A), "車輛/工廠",   circle = false)
+                            }
                         }
                     }
                 }
