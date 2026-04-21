@@ -19,7 +19,9 @@ data class AqiRecord(
     @SerializedName("pm2.5") val pm25: String,
     val latitude: String,
     val longitude: String,
-    val publishtime: String? = null
+    val publishtime: String? = null,
+    @SerializedName("windspeed") val windSpeed: String = "0",
+    @SerializedName("winddirection") val windDirection: String = "0"
 )
 
 data class AirQualityResponse(
@@ -27,22 +29,6 @@ data class AirQualityResponse(
     val county: String?,
     val message: String,
     val records: List<AqiRecord> = emptyList()
-)
-
-data class WeatherRecord(
-    val sitename: String,
-    val county: String,
-    val latitude: String? = null,
-    val longitude: String? = null,
-    @SerializedName("WindSpeed") val windSpeed: String,
-    @SerializedName("WindDirection") val windDirection: String
-)
-
-data class WeatherResponse(
-    val status: String,
-    val county: String?,
-    val message: String,
-    val records: List<WeatherRecord> = emptyList()
 )
 
 data class StructuredEvent(
@@ -171,9 +157,6 @@ data class HotspotResponse(
 interface AirQualityApiService {
     @GET("api/air_quality")
     suspend fun getAirQuality(@Query("county") county: String? = null): AirQualityResponse
-
-    @GET("api/weather")
-    suspend fun getWeather(@Query("county") county: String? = null): WeatherResponse
 
     @GET("api/news")
     suspend fun getNews(@Query("region") region: String? = null): NewsResponse

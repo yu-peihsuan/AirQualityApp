@@ -308,7 +308,7 @@ fun MapScreen(
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(12.dp)
+                            .padding(top = 64.dp, end = 12.dp, start = 12.dp, bottom = 12.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(Color.White.copy(alpha = 0.93f))
                             .padding(10.dp),

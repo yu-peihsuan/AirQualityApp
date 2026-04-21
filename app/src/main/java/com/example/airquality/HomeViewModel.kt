@@ -24,12 +24,6 @@ sealed class AqiUiState {
     data class Error(val message: String) : AqiUiState()
 }
 
-sealed class WeatherUiState {
-    object Loading : WeatherUiState()
-    data class Success(val nearestRecord: WeatherRecord) : WeatherUiState()
-    data class Error(val message: String) : WeatherUiState()
-}
-
 sealed class RagAdviceUiState {
     object Idle : RagAdviceUiState()
     object Loading : RagAdviceUiState()
@@ -42,10 +36,7 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<AqiUiState>(AqiUiState.Loading)
     val uiState: StateFlow<AqiUiState> = _uiState.asStateFlow()
 
-    private val _weatherState = MutableStateFlow<WeatherUiState>(WeatherUiState.Loading)
-    val weatherState: StateFlow<WeatherUiState> = _weatherState.asStateFlow()
-
-    private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
+private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
     val ragAdviceState: StateFlow<RagAdviceUiState> = _ragAdviceState.asStateFlow()
 
     // GPS 座標（由 fetchAirQualityByLocation 設定，供下風處判斷使用）
@@ -55,8 +46,6 @@ class HomeViewModel : ViewModel() {
     fun fetchAirQuality(context: Context?, address: String) {
         viewModelScope.launch {
             _uiState.value = AqiUiState.Loading
-            _weatherState.value = WeatherUiState.Loading
-
             try {
                 val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
                 val aqiRecords = aqiResponse.records ?: emptyList()
@@ -66,33 +55,9 @@ class HomeViewModel : ViewModel() {
                 val nearestAqi = findNearestStation(aqiRecords, lat, lng)
                 _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, displayRegion)
 
-                // 取得最近氣象站
-                fetchWeatherForStation(lat, lng)
-
             } catch (e: Exception) {
                 _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
-                _weatherState.value = WeatherUiState.Error("氣象資料取得失敗")
                 Log.e("HomeViewModel", "fetchAirQuality failed", e)
-            }
-        }
-    }
-
-    private suspend fun fetchWeatherForStation(targetLat: Double, targetLng: Double) {
-        viewModelScope.launch {
-            try {
-                val weatherResponse = RetrofitClient.apiService.getWeather(null)
-                val weatherRecords = weatherResponse.records ?: emptyList()
-                if (weatherRecords.isEmpty()) {
-                    _weatherState.value = WeatherUiState.Error("沒有氣象資料")
-                    return@launch
-                }
-
-                val nearestWeather = findNearestStation(weatherRecords, targetLat, targetLng)
-                _weatherState.value = WeatherUiState.Success(nearestWeather)
-
-            } catch (e: Exception) {
-                _weatherState.value = WeatherUiState.Error("氣象資料取得失敗")
-                Log.e("HomeViewModel", "fetchWeatherForStation failed", e)
             }
         }
     }
@@ -100,7 +65,6 @@ class HomeViewModel : ViewModel() {
     fun fetchAirQualityByLocation(context: Context, location: Location, fallbackAddress: String) {
         viewModelScope.launch {
             _uiState.value = AqiUiState.Loading
-            _weatherState.value = WeatherUiState.Loading
             try {
                 // 使用 Google Maps Geocoding API 反向地理編碼，取得縣市名
                 val region = googleReverseGeocodeCounty(location.latitude, location.longitude)
@@ -114,13 +78,11 @@ class HomeViewModel : ViewModel() {
                 _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, region)
                 _userLat = location.latitude
                 _userLng = location.longitude
-                fetchWeatherForStation(location.latitude, location.longitude)
                 // GPS 縣市確認後，上傳 FCM Token 給後端
                 TokenManager.uploadTokenWithCounty(context, nearestAqi.county)
 
             } catch (e: Exception) {
                 _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
-                _weatherState.value = WeatherUiState.Error("氣象資料取得失敗")
                 Log.e("HomeViewModel", "fetchAirQualityByLocation failed", e)
             }
         }
@@ -190,16 +152,8 @@ class HomeViewModel : ViewModel() {
     // 找最近測站
     private fun <T> findNearestStation(records: List<T>, lat: Double, lng: Double): T {
         return records.minByOrNull {
-            val rLat = when (it) {
-                is AqiRecord -> it.latitude.toDoubleOrNull() ?: 0.0
-                is WeatherRecord -> it.latitude?.toDoubleOrNull() ?: 0.0
-                else -> 0.0
-            }
-            val rLng = when (it) {
-                is AqiRecord -> it.longitude.toDoubleOrNull() ?: 0.0
-                is WeatherRecord -> it.longitude?.toDoubleOrNull() ?: 0.0
-                else -> 0.0
-            }
+            val rLat = if (it is AqiRecord) it.latitude.toDoubleOrNull() ?: 0.0 else 0.0
+            val rLng = if (it is AqiRecord) it.longitude.toDoubleOrNull() ?: 0.0 else 0.0
             haversine(lat, lng, rLat, rLng)
         } ?: records.first()
     }
