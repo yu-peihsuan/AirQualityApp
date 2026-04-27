@@ -164,6 +164,9 @@ interface AirQualityApiService {
     @GET("api/user_reports")
     suspend fun getUserReports(@Query("region") region: String? = null): NewsResponse
 
+    @GET("api/fire_alerts")
+    suspend fun getFireAlerts(@Query("region") region: String? = null): NewsResponse
+
     @GET("api/user_reports/history")
     suspend fun getUserReportsHistory(): NewsResponse
 
