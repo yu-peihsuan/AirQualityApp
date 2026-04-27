@@ -93,7 +93,7 @@ private fun cardContent(item: NewsRecord, group: NotifGroup): Pair<String, Strin
     )
     NotifGroup.FORECAST -> Pair(
         item.title,
-        item.summary.ifBlank { item.region }
+        item.summary.take(40).ifBlank { item.region }
     )
     NotifGroup.NEWS     -> Pair(
         item.title,
