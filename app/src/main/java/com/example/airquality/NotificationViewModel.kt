@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class NotifGroup { FIRE, REPORT, AQI, NEWS }
+enum class NotifGroup { FIRE, REPORT, AQI, FORECAST, NEWS }
 
 data class NotificationSection(
     val group: NotifGroup,
@@ -37,6 +37,9 @@ class NotificationViewModel : ViewModel() {
                 val fireAlertsResponse = try {
                     RetrofitClient.apiService.getFireAlerts(regionParam)
                 } catch (e: Exception) { null }
+                val forecastResponse   = try {
+                    RetrofitClient.apiService.getForecast(regionParam)
+                } catch (e: Exception) { null }
 
                 // ── 火災警示 ──────────────────────────────────────────────────
                 val fireAlerts = fireAlertsResponse?.records ?: emptyList()
@@ -61,15 +64,19 @@ class NotificationViewModel : ViewModel() {
                     )
                 }
 
+                // ── 明日空品惡化預報（AQI ≥ 101）────────────────────────────────
+                val forecasts = forecastResponse?.records ?: emptyList()
+
                 // ── 新聞（舊到新排列）────────────────────────────────────────
                 val news = (newsResponse.records ?: emptyList()).reversed()
 
                 // 組 sections，只加有資料的
                 val sections = buildList {
-                    if (fireAlerts.isNotEmpty())  add(NotificationSection(NotifGroup.FIRE,   fireAlerts))
-                    if (userReports.isNotEmpty()) add(NotificationSection(NotifGroup.REPORT, userReports))
-                    if (aqiAlerts.isNotEmpty())   add(NotificationSection(NotifGroup.AQI,    aqiAlerts))
-                    if (news.isNotEmpty())        add(NotificationSection(NotifGroup.NEWS,   news))
+                    if (fireAlerts.isNotEmpty())  add(NotificationSection(NotifGroup.FIRE,     fireAlerts))
+                    if (userReports.isNotEmpty()) add(NotificationSection(NotifGroup.REPORT,   userReports))
+                    if (aqiAlerts.isNotEmpty())   add(NotificationSection(NotifGroup.AQI,      aqiAlerts))
+                    if (forecasts.isNotEmpty())   add(NotificationSection(NotifGroup.FORECAST, forecasts))
+                    if (news.isNotEmpty())        add(NotificationSection(NotifGroup.NEWS,     news))
                 }
 
                 _uiState.value = NotificationUiState.Success(sections)

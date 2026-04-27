@@ -58,10 +58,11 @@ private data class SectionStyle(
 
 @Composable
 private fun sectionStyle(group: NotifGroup): SectionStyle = when (group) {
-    NotifGroup.FIRE   -> SectionStyle("🔥", "火災警示",    Color(0xFFB71C1C), Color(0xFFFFF3F3))
-    NotifGroup.REPORT -> SectionStyle("👤", "民眾回報",    OrangeMain,        OrangeLight)
-    NotifGroup.AQI    -> SectionStyle("🔴", "空氣品質警報", AqiRed,           Color(0xFFFFF3F3))
-    NotifGroup.NEWS   -> SectionStyle("📰", "近期新聞",    TextGray,          CardWhite)
+    NotifGroup.FIRE     -> SectionStyle("🔥", "火災警示",    Color(0xFFB71C1C), Color(0xFFFFF3F3))
+    NotifGroup.REPORT   -> SectionStyle("👤", "民眾回報",    OrangeMain,        OrangeLight)
+    NotifGroup.AQI      -> SectionStyle("🔴", "空氣品質警報", AqiRed,           Color(0xFFFFF3F3))
+    NotifGroup.FORECAST -> SectionStyle("📅", "空品預報警示", Color(0xFF1565C0), Color(0xFFE3F2FD))
+    NotifGroup.NEWS     -> SectionStyle("📰", "近期新聞",    TextGray,          CardWhite)
 }
 
 // ── 卡片內容萃取 ──────────────────────────────────────────────────────────────
@@ -86,11 +87,15 @@ private fun cardContent(item: NewsRecord, group: NotifGroup): Pair<String, Strin
         eventLabel(item.structuredEvent?.eventType ?: item.category),
         item.summary.take(50).ifBlank { item.region }
     )
-    NotifGroup.AQI    -> Pair(
+    NotifGroup.AQI      -> Pair(
         item.title,
         item.summary.ifBlank { item.region }
     )
-    NotifGroup.NEWS   -> Pair(
+    NotifGroup.FORECAST -> Pair(
+        item.title,
+        item.summary.ifBlank { item.region }
+    )
+    NotifGroup.NEWS     -> Pair(
         item.title,
         item.region.ifBlank { item.summary.take(30) }
     )
