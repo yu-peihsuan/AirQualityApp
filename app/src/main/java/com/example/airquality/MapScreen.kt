@@ -46,6 +46,7 @@ sealed class MapUiState {
         val hotspots: List<HotspotRecord>,
         val reports: List<NewsRecord>,
         val newsEvents: List<NewsRecord>,
+        val fireAlerts: List<NewsRecord>,
         val userLocation: LatLng?
     ) : MapUiState()
     data class Error(val message: String) : MapUiState()
@@ -66,22 +67,78 @@ class MapViewModel : ViewModel() {
                 val hotspotsDeferred    = async { RetrofitClient.apiService.getHotspots() }
                 val reportsDeferred     = async { RetrofitClient.apiService.getUserReports() }
                 val newsDeferred        = async { RetrofitClient.apiService.getNews() }
+                val fireAlertsDeferred  = async {
+                    try { RetrofitClient.apiService.getFireAlerts() } catch (e: Exception) { null }
+                }
                 val locationDeferred    = async { getCurrentLocation(context) }
 
                 val hotspots     = hotspotsDeferred.await().hotspots
                 val reports      = reportsDeferred.await().records.filter {
                     it.latitude != null && it.longitude != null
                 }
-                // 只顯示有座標的新聞確認事件
                 val newsEvents   = newsDeferred.await().records.filter {
+                    it.latitude != null && it.longitude != null
+                }
+                val fireAlerts   = (fireAlertsDeferred.await()?.records ?: emptyList()).filter {
                     it.latitude != null && it.longitude != null
                 }
                 val userLocation = locationDeferred.await()
 
-                _uiState.value = MapUiState.Success(hotspots, reports, newsEvents, userLocation)
+                // 去重：同縣市 + 火災類型 + 時間差 ≤ 2 小時的新聞/回報，以消防署警示為準
+                val dedupedNews    = deduplicateWithFireAlerts(fireAlerts, newsEvents)
+                val dedupedReports = deduplicateWithFireAlerts(fireAlerts, reports)
+
+                _uiState.value = MapUiState.Success(hotspots, dedupedReports, dedupedNews, fireAlerts, userLocation)
             } catch (e: Exception) {
                 Log.e("MapViewModel", "fetchMapData failed", e)
                 _uiState.value = MapUiState.Error("地圖資料取得失敗")
+            }
+        }
+    }
+
+    private fun parseTimestampMillis(ts: String): Long? {
+        if (ts.isBlank()) return null
+        return try {
+            // 處理 "2026-04-22T17:21:59+08:00" → "2026-04-22T17:21:59+0800"
+            val normalized = ts.replace(Regex("([+-]\\d{2}):(\\d{2})$"), "$1$2")
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.getDefault())
+                .parse(normalized)?.time
+        } catch (e: Exception) { null }
+    }
+
+    private fun haversineKm(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val R = 6371.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val sinDLat = Math.sin(dLat / 2)
+        val sinDLng = Math.sin(dLng / 2)
+        val a = sinDLat * sinDLat +
+            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * sinDLng * sinDLng
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    }
+
+    /**
+     * 從 candidates 中移除「與任一 fireAlert 距離 ≤ 5km 且時間差 ≤ 4 小時的火災事件」。
+     * 兩者都需要有座標才執行距離去重；缺少座標的事件一律保留。
+     */
+    private fun deduplicateWithFireAlerts(
+        fireAlerts: List<NewsRecord>,
+        candidates: List<NewsRecord>
+    ): List<NewsRecord> {
+        if (fireAlerts.isEmpty()) return candidates
+        val fourHoursMs = 4 * 60 * 60 * 1000L
+        return candidates.filter { candidate ->
+            val evType = candidate.structuredEvent?.eventType ?: candidate.category
+            if (evType != "fire") return@filter true          // 非火災，保留
+            val cLat  = candidate.latitude  ?: return@filter true  // 無座標，保留
+            val cLng  = candidate.longitude ?: return@filter true
+            val cTime = parseTimestampMillis(candidate.publishedAt) ?: return@filter true
+            fireAlerts.none { alert ->
+                val aLat  = alert.latitude  ?: return@none false
+                val aLng  = alert.longitude ?: return@none false
+                val aTime = parseTimestampMillis(alert.publishedAt) ?: return@none false
+                haversineKm(cLat, cLng, aLat, aLng) <= 5.0 &&
+                    kotlin.math.abs(aTime - cTime) <= fourHoursMs
             }
         }
     }
@@ -186,6 +243,19 @@ fun MapScreen(
                 if (uiState is MapUiState.Success) {
                     val data = uiState as MapUiState.Success
 
+                    // ── 層0：消防署火災警示 pin ───────────────────────────────
+                    data.fireAlerts.forEach { alert ->
+                        val lat = alert.latitude ?: return@forEach
+                        val lng = alert.longitude ?: return@forEach
+                        MarkerComposable(
+                            state   = MarkerState(position = LatLng(lat, lng)),
+                            title   = "🔥 重大火災警示",
+                            snippet = "${alert.title.take(30)}｜${alert.summary.take(20)}",
+                        ) {
+                            FireAlertPin()
+                        }
+                    }
+
                     // ── 層1：新聞確認事件 pin ─────────────────────────────────
                     data.newsEvents.forEach { news ->
                         val lat = news.latitude ?: return@forEach
@@ -286,7 +356,7 @@ fun MapScreen(
             // ── 無任何資料提示（熱點＆回報都空才顯示） ───────────────────────
             if (uiState is MapUiState.Success) {
                 val data = uiState as MapUiState.Success
-                if (data.hotspots.isEmpty() && data.reports.isEmpty() && data.newsEvents.isEmpty()) {
+                if (data.hotspots.isEmpty() && data.reports.isEmpty() && data.newsEvents.isEmpty() && data.fireAlerts.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -303,39 +373,58 @@ fun MapScreen(
             // ── 圖例 ──────────────────────────────────────────────────────────
             if (uiState is MapUiState.Success) {
                 val data = uiState as MapUiState.Success
-                if (data.hotspots.isNotEmpty() || data.reports.isNotEmpty() || data.newsEvents.isNotEmpty()) {
+                if (data.hotspots.isNotEmpty() || data.reports.isNotEmpty() || data.newsEvents.isNotEmpty() || data.fireAlerts.isNotEmpty()) {
+                    var legendExpanded by remember { mutableStateOf(false) }
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(12.dp)
+                            .padding(top = 64.dp, end = 12.dp, start = 12.dp, bottom = 12.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(Color.White.copy(alpha = 0.93f))
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text("圖例", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
-                        if (data.hotspots.isNotEmpty()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text("— 熱點叢集", fontSize = 10.sp, color = TextGray)
-                            LegendItem(Color(0xFFE53935), "高強度 ≥ 80%", circle = true)
-                            LegendItem(Color(0xFFFF6600), "中強度 ≥ 50%", circle = true)
-                            LegendItem(Color(0xFFFFCC00), "低強度 < 50%", circle = true)
-                            LegendItem(Color(0xFF6A1B9A), "擴散條件差（無風）", circle = true)
+                        Row(
+                            modifier = Modifier.clickable { legendExpanded = !legendExpanded },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("圖例", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                            Text(
+                                if (legendExpanded) "▲" else "▼",
+                                fontSize = 9.sp,
+                                color = TextGray
+                            )
                         }
-                        if (data.newsEvents.isNotEmpty()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text("— 新聞確認事件", fontSize = 10.sp, color = TextGray)
-                            LegendItem(Color(0xFFE53935), "火災/濃煙", circle = false, isNews = true)
-                            LegendItem(Color(0xFF8E24AA), "化學/異味", circle = false, isNews = true)
-                        }
-                        if (data.reports.isNotEmpty()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text("— 個別回報", fontSize = 10.sp, color = TextGray)
-                            LegendItem(Color(0xFFE53935), "火災/濃煙",   circle = false)
-                            LegendItem(Color(0xFF8E24AA), "化學異味",    circle = false)
-                            LegendItem(Color(0xFFFF8F00), "揚塵",        circle = false)
-                            LegendItem(Color(0xFF00897B), "異味",        circle = false)
-                            LegendItem(Color(0xFF546E7A), "車輛/工廠",   circle = false)
+                        if (legendExpanded) {
+                            if (data.fireAlerts.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text("— 消防署火災警示", fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFB71C1C), "重大火災", circle = false, isFireAlert = true)
+                            }
+                            if (data.hotspots.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text("— 熱點叢集", fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFE53935), "高強度 ≥ 80%", circle = true)
+                                LegendItem(Color(0xFFFF6600), "中強度 ≥ 50%", circle = true)
+                                LegendItem(Color(0xFFFFCC00), "低強度 < 50%", circle = true)
+                                LegendItem(Color(0xFF6A1B9A), "擴散條件差（無風）", circle = true)
+                            }
+                            if (data.newsEvents.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text("— 新聞確認事件", fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFE53935), "火災/濃煙", circle = false, isNews = true)
+                                LegendItem(Color(0xFF8E24AA), "化學/異味", circle = false, isNews = true)
+                            }
+                            if (data.reports.isNotEmpty()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text("— 個別回報", fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFE53935), "火災/濃煙",   circle = false)
+                                LegendItem(Color(0xFF8E24AA), "化學異味",    circle = false)
+                                LegendItem(Color(0xFFFF8F00), "揚塵",        circle = false)
+                                LegendItem(Color(0xFF00897B), "異味",        circle = false)
+                                LegendItem(Color(0xFF546E7A), "車輛/工廠",   circle = false)
+                            }
                         }
                     }
                 }
@@ -349,6 +438,29 @@ fun MapScreen(
 private fun windDirectionLabel(deg: Double): String = when ((deg + 22.5).toInt() / 45 % 8) {
     0 -> "北"; 1 -> "東北"; 2 -> "東"; 3 -> "東南"
     4 -> "南"; 5 -> "西南"; 6 -> "西"; else -> "西北"
+}
+
+// ── 消防署火災警示 Pin ─────────────────────────────────────────────────────────
+
+@Composable
+fun FireAlertPin() {
+    Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFB71C1C).copy(alpha = 0.22f))
+        )
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFB71C1C)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("🔥", fontSize = 14.sp)
+        }
+    }
 }
 
 // ── 新聞確認事件 Pin（菱形外框區別民眾回報）────────────────────────────────────
@@ -439,9 +551,21 @@ fun HotspotMarker(count: Int, color: Color, isCalmWind: Boolean = false) {
 // ── 圖例列 ────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun LegendItem(color: Color, label: String, circle: Boolean, isNews: Boolean = false) {
+private fun LegendItem(
+    color: Color,
+    label: String,
+    circle: Boolean,
+    isNews: Boolean = false,
+    isFireAlert: Boolean = false
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         when {
+            isFireAlert -> Box(
+                modifier = Modifier.size(12.dp).clip(CircleShape).background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🔥", fontSize = 7.sp)
+            }
             circle -> Box(
                 modifier = Modifier.size(10.dp).clip(CircleShape).background(color)
             )

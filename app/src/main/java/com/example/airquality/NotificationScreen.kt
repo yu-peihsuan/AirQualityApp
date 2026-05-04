@@ -1,49 +1,125 @@
 package com.example.airquality
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.clickable
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airquality.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Locale
+
+// ── 相對時間 ───────────────────────────────────────────────────────────────────
+
+private fun relativeTime(timestamp: String): String {
+    if (timestamp.isBlank()) return ""
+    return try {
+        val clean = timestamp
+            .replace(Regex("[+-]\\d{2}:\\d{2}$"), "")
+            .replace("Z", "")
+            .trim()
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+        sdf.timeZone = java.util.TimeZone.getTimeZone("Asia/Taipei")
+        val date = sdf.parse(clean) ?: return timestamp.take(10)
+        val diff = System.currentTimeMillis() - date.time
+        val m = diff / 60_000
+        when {
+            m < 1    -> "剛剛"
+            m < 60   -> "${m} 分鐘前"
+            m < 1440 -> "${m / 60} 小時前"
+            else     -> "${m / 1440} 天前"
+        }
+    } catch (e: Exception) {
+        timestamp.take(10)
+    }
+}
+
+// ── Section 樣式設定 ───────────────────────────────────────────────────────────
+
+private data class SectionStyle(
+    val icon: String,
+    val label: String,
+    val accentColor: Color,
+    val cardBg: Color
+)
+
+@Composable
+private fun sectionStyle(group: NotifGroup): SectionStyle = when (group) {
+    NotifGroup.FIRE     -> SectionStyle("🔥", "火災警示",    Color(0xFFB71C1C), Color(0xFFFFF3F3))
+    NotifGroup.REPORT   -> SectionStyle("👤", "民眾回報",    OrangeMain,        OrangeLight)
+    NotifGroup.AQI      -> SectionStyle("🔴", "空氣品質警報", AqiRed,           Color(0xFFFFF3F3))
+    NotifGroup.FORECAST -> SectionStyle("📅", "空品預報警示", Color(0xFF1565C0), Color(0xFFE3F2FD))
+    NotifGroup.NEWS     -> SectionStyle("📰", "近期新聞",    TextGray,          CardWhite)
+}
+
+// ── 卡片內容萃取 ──────────────────────────────────────────────────────────────
+
+private fun eventLabel(type: String?): String = when (type) {
+    "fire"                -> "火災/濃煙"
+    "chemical"            -> "化學異味"
+    "dust"                -> "揚塵"
+    "odor"                -> "異味"
+    "vehicle"             -> "車輛廢氣"
+    "factory"             -> "工廠排放"
+    "general_air_quality" -> "空氣品質不良"
+    else                  -> "污染回報"
+}
+
+private fun cardContent(item: NewsRecord, group: NotifGroup): Pair<String, String> = when (group) {
+    NotifGroup.FIRE   -> Pair(
+        item.title.ifBlank { "重大火災" },
+        item.summary.ifBlank { item.region }
+    )
+    NotifGroup.REPORT -> Pair(
+        eventLabel(item.structuredEvent?.eventType ?: item.category),
+        item.summary.take(50).ifBlank { item.region }
+    )
+    NotifGroup.AQI      -> Pair(
+        item.title,
+        item.summary.ifBlank { item.region }
+    )
+    NotifGroup.FORECAST -> {
+        val hint = item.summary
+            .split("\n", "。")
+            .map { it.trim() }
+            .firstOrNull { it.contains("等級") && it.length > 10 }
+            ?.take(60)
+            ?: item.summary.take(60)
+        Pair(item.title, hint.ifBlank { item.region })
+    }
+    NotifGroup.NEWS     -> Pair(
+        item.title,
+        item.region.ifBlank { item.summary.take(30) }
+    )
+}
+
+// ── NotificationScreen ────────────────────────────────────────────────────────
 
 @Composable
 fun NotificationScreen(
     homeViewModel: HomeViewModel = viewModel(),
     viewModel: NotificationViewModel = viewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState     by viewModel.uiState.collectAsState()
     val homeUiState by homeViewModel.uiState.collectAsState()
-    var showMap by remember { mutableStateOf(false) }
+    var showMap     by remember { mutableStateOf(false) }
 
-    // 從 HomeViewModel 取得 GPS 定位到的縣市，作為新聞篩選條件
     val county = (homeUiState as? AqiUiState.Success)?.nearestRecord?.county
+    LaunchedEffect(county) { viewModel.fetchNotifications(county) }
 
-    LaunchedEffect(county) {
-        viewModel.fetchNotifications(county)
-    }
-
-    // 顯示地圖畫面
     if (showMap) {
         MapScreen(onBack = { showMap = false })
         return
@@ -54,7 +130,6 @@ fun NotificationScreen(
             .fillMaxSize()
             .background(BgMain)
     ) {
-        // ── Header ──────────────────────────────────────────────────────────
         AppHeader(
             title = "通知中心",
             actions = {
@@ -69,102 +144,139 @@ fun NotificationScreen(
             }
         )
 
-        // ── 主內容 (scrollable) ─────────────────────────────────────────────
         when (uiState) {
             is NotificationUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = OrangeMain)
                 }
             }
             is NotificationUiState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text((uiState as NotificationUiState.Error).message, color = RedText)
                 }
             }
             is NotificationUiState.Success -> {
-                val notifications = (uiState as NotificationUiState.Success).notifications
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp)
-                ) {
-                    Spacer(Modifier.height(20.dp))
-                    
-                    if (notifications.isEmpty()) {
-                        Text("目前沒有與您所在區域相關的最新通知。", color = TextMid, fontSize = 16.sp)
-                    } else {
-                        notifications.forEach { news ->
-                            val isWarning = news.title.contains("大火") || news.title.contains("火災") || news.title.contains("火警") || news.title.contains("濃煙") || news.title.contains("失火") || news.title.contains("火燒山") || news.title.contains("空氣品質不良") || news.title.contains("空氣品質惡化") || news.title.contains("空氣品質紅色警戒")
-                            val isGood = news.title.contains("轉好") || news.title.contains("改善")
-                            
-                            val emoji = if (isWarning) "⚠️" else if (isGood) "✅" else "📰"
-                            val emojiBg = if (isWarning) RedCard else if (isGood) GreenCard else CardWhite
-                            val tag = news.source
-                            val tagColor = if (isWarning) RedText else if (isGood) GreenText else OrangeMain
-                            val cardBg = if (isWarning) RedCard else if (isGood) GreenCard else CardWhite
-                            
-                            NotifyCard(
-                                emoji = emoji,
-                                emojiBg = emojiBg,
-                                tag = tag,
-                                tagColor = tagColor,
-                                time = news.publishedAt.take(16),
-                                title = news.title,
-                                body = news.summary.ifBlank { news.region },
-                                cardBg = cardBg
-                            )
-                            Spacer(Modifier.height(12.dp))
-                        }
+                val sections = (uiState as NotificationUiState.Success).sections
+                if (sections.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("目前沒有與您所在區域相關的通知。", color = TextMid, fontSize = 16.sp)
                     }
-
-                    Spacer(Modifier.height(32.dp))
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Spacer(Modifier.height(16.dp))
+                        sections.forEach { section ->
+                            SectionBlock(section = section)
+                            Spacer(Modifier.height(20.dp))
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
                 }
             }
         }
     }
 }
 
+// ── Section 區塊 ──────────────────────────────────────────────────────────────
+
 @Composable
-fun NotifyCard(
-    emoji: String,
-    emojiBg: androidx.compose.ui.graphics.Color,
-    tag: String,
-    tagColor: androidx.compose.ui.graphics.Color,
-    time: String,
-    title: String,
-    body: String,
-    cardBg: androidx.compose.ui.graphics.Color
+private fun SectionBlock(section: NotificationSection) {
+    val style = sectionStyle(section.group)
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(bottom = 8.dp)
+    ) {
+        Text(style.icon, fontSize = 16.sp)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            style.label,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = style.accentColor
+        )
+        Spacer(Modifier.width(6.dp))
+        Text("${section.items.size} 件", fontSize = 13.sp, color = TextGray)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        section.items.forEach { item ->
+            NotifItem(
+                item        = item,
+                group       = section.group,
+                accentColor = style.accentColor,
+                cardBg      = style.cardBg
+            )
+        }
+    }
+}
+
+// ── 單筆通知卡片 ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun NotifItem(
+    item: NewsRecord,
+    group: NotifGroup,
+    accentColor: Color,
+    cardBg: Color
 ) {
+    val (title, subtitle) = cardContent(item, group)
+    val time = relativeTime(item.publishedAt)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(cardBg)
-            .padding(16.dp),
-        verticalAlignment = Alignment.Top
     ) {
+        // 左側色條
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(emojiBg),
-            contentAlignment = Alignment.Center
+                .width(4.dp)
+                .defaultMinSize(minHeight = 56.dp)
+                .fillMaxHeight()
+                .background(accentColor)
+        )
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            Text(emoji, fontSize = 21.sp)
-        }
-
-        Spacer(Modifier.width(12.dp))
-
-        Column(Modifier.weight(1f)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(tag, color = tagColor, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Text(time, color = TextGray, fontSize = 14.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text     = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color    = TextDark,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (time.isNotBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(text = time, fontSize = 12.sp, color = TextGray)
+                }
             }
-            Spacer(Modifier.height(4.dp))
-            Text(title, color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            Text(body, color = TextMid, fontSize = 16.sp, lineHeight = 22.sp)
+
+            if (subtitle.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text     = subtitle,
+                    fontSize = 13.sp,
+                    color    = TextMid,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

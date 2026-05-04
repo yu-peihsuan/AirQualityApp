@@ -8,9 +8,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+enum class NotifGroup { FIRE, REPORT, AQI, FORECAST, NEWS }
+
+data class NotificationSection(
+    val group: NotifGroup,
+    val items: List<NewsRecord>
+)
+
 sealed class NotificationUiState {
     object Loading : NotificationUiState()
-    data class Success(val notifications: List<NewsRecord>) : NotificationUiState()
+    data class Success(val sections: List<NotificationSection>) : NotificationUiState()
     data class Error(val message: String) : NotificationUiState()
 }
 
@@ -24,42 +31,59 @@ class NotificationViewModel : ViewModel() {
             try {
                 val regionParam = county?.ifBlank { null }
 
-                // 同時取得新聞、民眾回報與 AQI 資料
-                val newsResponse = RetrofitClient.apiService.getNews(regionParam)
-                val userReportsResponse = RetrofitClient.apiService.getUserReports()
-                val aqiResponse = RetrofitClient.apiService.getAirQuality(regionParam)
+                val newsResponse       = RetrofitClient.apiService.getNews(regionParam)
+                val reportsResponse    = RetrofitClient.apiService.getUserReports(regionParam)
+                val aqiResponse        = RetrofitClient.apiService.getAirQuality(regionParam)
+                val fireAlertsResponse = try {
+                    RetrofitClient.apiService.getFireAlerts(regionParam)
+                } catch (e: Exception) { null }
+                val forecastResponse   = try {
+                    RetrofitClient.apiService.getForecast(regionParam)
+                } catch (e: Exception) { null }
 
-                val newsRecords = (newsResponse.records ?: emptyList()).reversed().toMutableList()
+                // ── 火災警示 ──────────────────────────────────────────────────
+                val fireAlerts = fireAlertsResponse?.records ?: emptyList()
 
-                // 民眾回報排在最上方
-                val userReports = (userReportsResponse.records ?: emptyList())
-                newsRecords.addAll(0, userReports)
+                // ── 民眾回報 ──────────────────────────────────────────────────
+                val userReports = reportsResponse.records ?: emptyList()
 
-                // 若 AQI >= 151 (紅色警戒)，在最上方插入警報卡片
-                val aqiRecords = aqiResponse.records ?: emptyList()
-                if (aqiRecords.isNotEmpty()) {
-                    val maxAqiRecord = aqiRecords.maxByOrNull { it.aqi.toIntOrNull() ?: 0 }
-                    val aqiValue = maxAqiRecord?.aqi?.toIntOrNull() ?: 0
-                    if (aqiValue >= 151) {
-                        val alertRecord = NewsRecord(
-                            source = "空氣品質警報",
-                            region = regionParam ?: "全台",
-                            title = "空氣品質紅色警戒：${maxAqiRecord?.county ?: ""}${maxAqiRecord?.sitename ?: ""} AQI $aqiValue（${maxAqiRecord?.status ?: ""}）",
-                            summary = "",
-                            url = "",
-                            publishedAt = maxAqiRecord?.publishtime ?: "",
-                            timestamp = ""
-                        )
-                        newsRecords.add(0, alertRecord)
-                    }
+                // ── AQI 警報（AQI ≥ 151 才顯示）────────────────────────────────
+                val aqiAlerts = mutableListOf<NewsRecord>()
+                val maxAqi = (aqiResponse.records ?: emptyList())
+                    .maxByOrNull { it.aqi.toIntOrNull() ?: 0 }
+                val aqiValue = maxAqi?.aqi?.toIntOrNull() ?: 0
+                if (aqiValue >= 151) {
+                    aqiAlerts += NewsRecord(
+                        source     = "空氣品質警報",
+                        region     = regionParam ?: "全台",
+                        title      = "AQI $aqiValue（${maxAqi?.status ?: ""}）",
+                        summary    = "${maxAqi?.county ?: ""}${maxAqi?.sitename ?: ""}",
+                        url        = "",
+                        publishedAt = maxAqi?.publishtime ?: "",
+                        timestamp  = ""
+                    )
                 }
 
-                _uiState.value = NotificationUiState.Success(newsRecords)
+                // ── 明日空品惡化預報（AQI ≥ 101）────────────────────────────────
+                val forecasts = forecastResponse?.records ?: emptyList()
+
+                // ── 新聞（舊到新排列）────────────────────────────────────────
+                val news = (newsResponse.records ?: emptyList()).reversed()
+
+                // 組 sections，只加有資料的
+                val sections = buildList {
+                    if (fireAlerts.isNotEmpty())  add(NotificationSection(NotifGroup.FIRE,     fireAlerts))
+                    if (userReports.isNotEmpty()) add(NotificationSection(NotifGroup.REPORT,   userReports))
+                    if (aqiAlerts.isNotEmpty())   add(NotificationSection(NotifGroup.AQI,      aqiAlerts))
+                    if (forecasts.isNotEmpty())   add(NotificationSection(NotifGroup.FORECAST, forecasts))
+                    if (news.isNotEmpty())        add(NotificationSection(NotifGroup.NEWS,     news))
+                }
+
+                _uiState.value = NotificationUiState.Success(sections)
             } catch (e: Exception) {
                 _uiState.value = NotificationUiState.Error("通知資料取得失敗: ${e.localizedMessage}")
                 Log.e("NotificationViewModel", "fetchNotifications failed", e)
             }
         }
     }
-
 }
