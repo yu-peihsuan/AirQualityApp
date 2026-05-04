@@ -91,10 +91,15 @@ private fun cardContent(item: NewsRecord, group: NotifGroup): Pair<String, Strin
         item.title,
         item.summary.ifBlank { item.region }
     )
-    NotifGroup.FORECAST -> Pair(
-        item.title,
-        item.summary.take(40).ifBlank { item.region }
-    )
+    NotifGroup.FORECAST -> {
+        val hint = item.summary
+            .split("\n", "。")
+            .map { it.trim() }
+            .firstOrNull { it.contains("等級") && it.length > 10 }
+            ?.take(60)
+            ?: item.summary.take(60)
+        Pair(item.title, hint.ifBlank { item.region })
+    }
     NotifGroup.NEWS     -> Pair(
         item.title,
         item.region.ifBlank { item.summary.take(30) }
