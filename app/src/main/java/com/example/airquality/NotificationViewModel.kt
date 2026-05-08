@@ -64,8 +64,12 @@ class NotificationViewModel : ViewModel() {
                     )
                 }
 
-                // ── 明日空品惡化預報（AQI ≥ 101）────────────────────────────────
-                val forecasts = forecastResponse?.records ?: emptyList()
+                // ── 空品預報（只顯示與當前狀態不同的）────────────────────────────
+                val currentStatus = maxAqi?.status ?: ""
+                val forecasts = (forecastResponse?.records ?: emptyList()).filter { record ->
+                    val forecastStatus = record.title.substringAfterLast("：").trim()
+                    forecastStatus != currentStatus
+                }
 
                 // ── 新聞（舊到新排列）────────────────────────────────────────
                 val news = (newsResponse.records ?: emptyList()).reversed()
