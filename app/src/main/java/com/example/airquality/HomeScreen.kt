@@ -70,7 +70,8 @@ fun HomeScreen(
     val context = LocalContext.current
 
     // 監聽來自 ViewModel 的狀態變化
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState    by viewModel.uiState.collectAsState()
+    val isRaining  by viewModel.isRaining.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // 管理當前顯示的日期，讓它可以在回到畫面時更新
@@ -243,8 +244,8 @@ fun HomeScreen(
                         currentAqiInt <= 150 -> 2
                         else                 -> 3
                     }
-                    val chips = remember(aqiBand, hasAsthma, hasCardiovascular) {
-                        getActionChips(aqiBand, hasAsthma, hasCardiovascular)
+                    val chips = remember(aqiBand, hasAsthma, hasCardiovascular, isRaining) {
+                        getActionChips(aqiBand, hasAsthma, hasCardiovascular, isRaining)
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         chips.forEach { (icon, label) ->
@@ -451,38 +452,59 @@ private data class ChipItem(val icon: Int, val label: String)
 private fun getActionChips(
     aqiBand: Int,
     hasAsthma: Boolean,
-    hasCardiovascular: Boolean
+    hasCardiovascular: Boolean,
+    isRaining: Boolean = false
 ): List<ChipItem> {
     val pool = mutableListOf<ChipItem>()
     when (aqiBand) {
         0 -> {
-            // AQI ≤ 50 良好：戶外活動
-            pool += listOf(
-                ChipItem(R.drawable.jogging,         "慢跑健行"),
-                ChipItem(R.drawable.walking_outside, "戶外散步"),
-                ChipItem(R.drawable.bicycle,         "騎腳踏車"),
-                ChipItem(R.drawable.open_window,     "開窗通風"),
-            )
+            if (isRaining) {
+                // 空氣好但下雨：改室內活動
+                pool += listOf(
+                    ChipItem(R.drawable.excercise_inside, "室內運動"),
+                    ChipItem(R.drawable.yoga,             "瑜珈伸展"),
+                    ChipItem(R.drawable.open_window,      "開窗通風"),
+                )
+            } else {
+                // AQI ≤ 50 良好：戶外活動
+                pool += listOf(
+                    ChipItem(R.drawable.jogging,         "戶外跑步"),
+                    ChipItem(R.drawable.walking_outside, "戶外散步"),
+                    ChipItem(R.drawable.bicycle,         "騎腳踏車"),
+                    ChipItem(R.drawable.open_window,     "開窗通風"),
+                )
+            }
         }
         1 -> {
-            // AQI 51–100 普通：輕度戶外 + 通風補水
-            pool += listOf(
-                ChipItem(R.drawable.walking_outside, "輕鬆散步"),
-                ChipItem(R.drawable.open_window,     "適度通風"),
-                ChipItem(R.drawable.drink_water,     "補充水分"),
-                ChipItem(R.drawable.alarm,           "關注空品"),
-            )
+            if (isRaining) {
+                // 普通空氣 + 下雨：室內為主
+                pool += listOf(
+                    ChipItem(R.drawable.excercise_inside, "室內運動"),
+                    ChipItem(R.drawable.yoga,             "瑜珈伸展"),
+                    ChipItem(R.drawable.drink_water,      "補充水分"),
+                    ChipItem(R.drawable.air_purifier,     "空氣清淨機"),
+                )
+            } else {
+                // AQI 51–100 普通：輕度戶外 + 通風補水
+                pool += listOf(
+                    ChipItem(R.drawable.walking_outside, "戶外散步"),
+                    ChipItem(R.drawable.open_window,     "開窗通風"),
+                    ChipItem(R.drawable.drink_water,     "補充水分"),
+                    ChipItem(R.drawable.air_purifier,    "空氣清淨機"),
+                )
+            }
         }
         2 -> {
             // AQI 101–150 敏感族群不健康：防護 + 室內活動
             pool += listOf(
-                ChipItem(R.drawable.mask,             "外出戴口罩"),
+                ChipItem(R.drawable.mask,             "戴口罩"),
                 ChipItem(R.drawable.window,           "關閉門窗"),
-                ChipItem(R.drawable.home,             "減少外出"),
+                ChipItem(R.drawable.stay_at_home,     "減少外出"),
                 ChipItem(R.drawable.drink_water,      "補充水分"),
                 ChipItem(R.drawable.excercise_inside, "室內運動"),
                 ChipItem(R.drawable.yoga,             "瑜珈伸展"),
                 ChipItem(R.drawable.public_transport, "搭大眾運輸"),
+                ChipItem(R.drawable.air_purifier,     "空氣清淨機"),
             )
             if (hasAsthma)         pool += ChipItem(R.drawable.inhaler,  "備妥吸入器")
             if (hasCardiovascular) pool += ChipItem(R.drawable.medicine,  "備妥藥物")
@@ -490,8 +512,8 @@ private fun getActionChips(
         else -> {
             // AQI > 150 所有人不健康：嚴格防護
             pool += listOf(
-                ChipItem(R.drawable.mask,             "外出戴口罩"),
-                ChipItem(R.drawable.window,           "緊閉門窗"),
+                ChipItem(R.drawable.mask,             "戴口罩"),
+                ChipItem(R.drawable.window,           "關閉門窗"),
                 ChipItem(R.drawable.air_purifier,     "空氣清淨機"),
                 ChipItem(R.drawable.home,             "盡量待室內"),
                 ChipItem(R.drawable.drink_water,      "多補充水分"),

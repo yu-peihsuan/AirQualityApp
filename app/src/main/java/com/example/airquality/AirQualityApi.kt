@@ -120,6 +120,17 @@ data class RagAdviceResponse(
     val message: String? = null
 )
 
+// ── 天氣資料結構 ──────────────────────────────────────────────────────────────
+
+data class WeatherResponse(
+    val status: String,
+    val county: String?,
+    @SerializedName("is_raining") val isRaining: Boolean = false,
+    val weather: String = "",
+    val temp: Double? = null,
+    val description: String = ""
+)
+
 // ── FCM Token 註冊 資料結構 ───────────────────────────────────────────────────
 
 data class FcmTokenRequest(
@@ -169,6 +180,9 @@ interface AirQualityApiService {
 
     @GET("api/forecast")
     suspend fun getForecast(@Query("county") county: String? = null): NewsResponse
+
+    @GET("api/weather")
+    suspend fun getWeather(@Query("county") county: String? = null): WeatherResponse
 
     @GET("api/user_reports/history")
     suspend fun getUserReportsHistory(): NewsResponse

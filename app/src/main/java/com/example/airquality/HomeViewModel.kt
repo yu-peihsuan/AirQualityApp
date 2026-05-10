@@ -36,8 +36,11 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<AqiUiState>(AqiUiState.Loading)
     val uiState: StateFlow<AqiUiState> = _uiState.asStateFlow()
 
-private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
+    private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
     val ragAdviceState: StateFlow<RagAdviceUiState> = _ragAdviceState.asStateFlow()
+
+    private val _isRaining = MutableStateFlow(false)
+    val isRaining: StateFlow<Boolean> = _isRaining.asStateFlow()
 
     // GPS 座標（由 fetchAirQualityByLocation 設定，供下風處判斷使用）
     private var _userLat: Double? = null
@@ -80,6 +83,13 @@ private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiStat
                 _userLng = location.longitude
                 // GPS 縣市確認後，上傳 FCM Token 給後端
                 TokenManager.uploadTokenWithCounty(context, nearestAqi.county)
+                // 抓即時天氣（判斷是否下雨，供首頁圖示使用）
+                try {
+                    val weather = RetrofitClient.apiService.getWeather(nearestAqi.county)
+                    _isRaining.value = weather.isRaining
+                } catch (e: Exception) {
+                    _isRaining.value = false
+                }
 
             } catch (e: Exception) {
                 _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
