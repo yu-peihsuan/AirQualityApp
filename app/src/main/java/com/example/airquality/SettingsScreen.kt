@@ -1,6 +1,7 @@
 package com.example.airquality
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import com.example.airquality.ui.theme.*
 import kotlinx.coroutines.launch
 
+private data class FavLocation(val name: String, val address: String)
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen() {
@@ -33,6 +36,21 @@ fun SettingsScreen() {
     var selectedAgeGroup  by remember { mutableStateOf(prefs.getString("health_age_group", "18-64歲") ?: "18-64歲") }
     var selectedSmoking   by remember { mutableStateOf(prefs.getString("health_smoking",   "不吸菸") ?: "不吸菸") }
     var otherText         by remember { mutableStateOf(prefs.getString("health_other",     "") ?: "") }
+
+    // ── 常用地點 state ────────────────────────────────────────────────────────
+    val favLocations = remember {
+        mutableStateListOf<FavLocation>().also { list ->
+            (1..3).forEach { i ->
+                list.add(FavLocation(
+                    name    = prefs.getString("fav_${i}_name",    "") ?: "",
+                    address = prefs.getString("fav_${i}_address", "") ?: ""
+                ))
+            }
+        }
+    }
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
+    var editName     by remember { mutableStateOf("") }
+    var editAddress  by remember { mutableStateOf("") }
 
     val savedConditions = prefs.getString("health_conditions", "") ?: ""
     val selectedConditions = remember {
@@ -154,6 +172,90 @@ fun SettingsScreen() {
                     ) {
                         Text("儲存健康檔案", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // ── 常用地點 ───────────────────────────────────────────────
+                SettingSection("常用地點") {
+                    favLocations.forEachIndexed { index, fav ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    editingIndex = index
+                                    editName    = fav.name
+                                    editAddress = fav.address
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (fav.name.isNotEmpty()) fav.name else "地點 ${index + 1}",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (fav.name.isNotEmpty()) TextDark else TextGray
+                                )
+                                if (fav.address.isNotEmpty()) {
+                                    Text(fav.address, fontSize = 12.sp, color = TextGray)
+                                } else {
+                                    Text("點擊設定", fontSize = 12.sp, color = TextGray)
+                                }
+                            }
+                            Text("✏️", fontSize = 16.sp)
+                        }
+                        if (index < 2) HorizontalDivider(color = DividerColor)
+                    }
+                }
+
+                // ── 常用地點編輯 Dialog ────────────────────────────────────
+                if (editingIndex != null) {
+                    AlertDialog(
+                        onDismissRequest = { editingIndex = null },
+                        containerColor = BgMain,
+                        title = { Text("編輯地點 ${(editingIndex ?: 0) + 1}", fontWeight = FontWeight.Bold, color = TextDark) },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = editName,
+                                    onValueChange = { editName = it },
+                                    label = { Text("名稱") },
+                                    placeholder = { Text("例如：家、公司、健身房", color = TextGray, fontSize = 13.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = healthTextFieldColors(),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = editAddress,
+                                    onValueChange = { editAddress = it },
+                                    label = { Text("地址") },
+                                    placeholder = { Text("例如：台北市中正區重慶南路", color = TextGray, fontSize = 13.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = healthTextFieldColors(),
+                                    singleLine = true
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val i = editingIndex ?: return@TextButton
+                                favLocations[i] = FavLocation(editName.trim(), editAddress.trim())
+                                prefs.edit()
+                                    .putString("fav_${i + 1}_name",    editName.trim())
+                                    .putString("fav_${i + 1}_address", editAddress.trim())
+                                    .apply()
+                                editingIndex = null
+                            }) { Text("儲存", color = OrangeMain) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { editingIndex = null }) { Text("取消", color = TextGray) }
+                        }
+                    )
                 }
 
                 Spacer(Modifier.height(20.dp))

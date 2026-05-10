@@ -42,6 +42,39 @@ class HomeViewModel : ViewModel() {
     private val _isRaining = MutableStateFlow(false)
     val isRaining: StateFlow<Boolean> = _isRaining.asStateFlow()
 
+    private val _currentLocationName = MutableStateFlow("GPS 定位")
+    val currentLocationName: StateFlow<String> = _currentLocationName.asStateFlow()
+
+    fun switchToSavedLocation(name: String, address: String) {
+        viewModelScope.launch {
+            _uiState.value = AqiUiState.Loading
+            _currentLocationName.value = name
+            try {
+                val coords = googleForwardGeocode(address)
+                val lat = coords?.first ?: 25.032969
+                val lng = coords?.second ?: 121.516039
+                val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
+                val aqiRecords  = aqiResponse.records ?: emptyList()
+                if (aqiRecords.isEmpty()) throw Exception("沒有取得 AQI 資料")
+                val nearestAqi = findNearestStation(aqiRecords, lat, lng)
+                _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, address)
+                _userLat = lat
+                _userLng = lng
+                try {
+                    val weather = RetrofitClient.apiService.getWeather(nearestAqi.county)
+                    _isRaining.value = weather.isRaining
+                } catch (e: Exception) { _isRaining.value = false }
+            } catch (e: Exception) {
+                _uiState.value = AqiUiState.Error("地點切換失敗: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun switchToGps(context: android.content.Context) {
+        _currentLocationName.value = "GPS 定位"
+        fetchWithGps(context, this)
+    }
+
     // GPS 座標（由 fetchAirQualityByLocation 設定，供下風處判斷使用）
     private var _userLat: Double? = null
     private var _userLng: Double? = null

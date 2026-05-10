@@ -76,13 +76,14 @@ fun AppHeader(
 }
 
 /**
- * 首頁專用 Header：左側顯示位置與日期，右側顯示鈴鐺
+ * 首頁專用 Header：左側顯示位置與日期，右側顯示地點切換鈕
  */
 @Composable
 fun HomeAppHeader(
     location: String,
     date: String,
-    onBellClick: () -> Unit = {}
+    currentLocationName: String = "GPS 定位",
+    onLocationSwitchClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -108,17 +109,17 @@ fun HomeAppHeader(
                         colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(HeaderText)
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text(location, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = HeaderText) // Location text size
+                    Text(location, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = HeaderText)
                 }
-                Text(date, color = TextGray, fontSize = 15.sp, modifier = Modifier.padding(start = 26.dp)) // 日期字體大小調整
+                Text(date, color = TextGray, fontSize = 15.sp, modifier = Modifier.padding(start = 26.dp))
             }
-            androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(id = R.drawable.bell),
-                contentDescription = "Bell",
+            Text(
+                "▼",
+                fontSize = 18.sp,
+                color = OrangeMain,
                 modifier = Modifier
-                    .size(24.dp)
-                    .clickable { onBellClick() },
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(HeaderText)
+                    .clickable { onLocationSwitchClick() }
+                    .padding(8.dp)
             )
         }
 

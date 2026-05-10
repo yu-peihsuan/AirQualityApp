@@ -96,6 +96,12 @@ class MapViewModel : ViewModel() {
         }
     }
 
+    fun timeAlpha(publishedAt: String): Float {
+        val ms = parseTimestampMillis(publishedAt) ?: return 0.4f
+        val hoursAgo = (System.currentTimeMillis() - ms) / 3_600_000f
+        return (1.0f - (hoursAgo / 24f) * 0.7f).coerceIn(0.3f, 1.0f)
+    }
+
     private fun parseTimestampMillis(ts: String): Long? {
         if (ts.isBlank()) return null
         return try {
@@ -247,12 +253,13 @@ fun MapScreen(
                     data.fireAlerts.forEach { alert ->
                         val lat = alert.latitude ?: return@forEach
                         val lng = alert.longitude ?: return@forEach
+                        val alpha = viewModel.timeAlpha(alert.publishedAt)
                         MarkerComposable(
                             state   = MarkerState(position = LatLng(lat, lng)),
                             title   = "🔥 重大火災警示",
                             snippet = "${alert.title.take(30)}｜${alert.summary.take(20)}",
                         ) {
-                            FireAlertPin()
+                            FireAlertPin(alpha = alpha)
                         }
                     }
 
@@ -264,13 +271,14 @@ fun MapScreen(
                         val color   = reportColor(evType)
                         val label   = eventTypeLabel(evType ?: news.category)
                         val snippet = news.title.take(40)
+                        val alpha   = viewModel.timeAlpha(news.publishedAt)
 
                         MarkerComposable(
                             state   = MarkerState(position = LatLng(lat, lng)),
                             title   = "📰 $label",
                             snippet = snippet,
                         ) {
-                            NewsEventPin(color = color)
+                            NewsEventPin(color = color, alpha = alpha)
                         }
                     }
 
@@ -282,13 +290,14 @@ fun MapScreen(
                         val color   = reportColor(evType)
                         val label   = eventTypeLabel(evType ?: report.category)
                         val snippet = report.summary.take(40).ifBlank { report.region }
+                        val alpha   = viewModel.timeAlpha(report.publishedAt)
 
                         MarkerComposable(
                             state   = MarkerState(position = LatLng(lat, lng)),
                             title   = label,
                             snippet = snippet,
                         ) {
-                            ReportPin(color = color)
+                            ReportPin(color = color, alpha = alpha)
                         }
                     }
 
@@ -443,19 +452,19 @@ private fun windDirectionLabel(deg: Double): String = when ((deg + 22.5).toInt()
 // ── 消防署火災警示 Pin ─────────────────────────────────────────────────────────
 
 @Composable
-fun FireAlertPin() {
+fun FireAlertPin(alpha: Float = 1f) {
     Box(contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
                 .size(42.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFB71C1C).copy(alpha = 0.22f))
+                .background(Color(0xFFB71C1C).copy(alpha = 0.22f * alpha))
         )
         Box(
             modifier = Modifier
                 .size(28.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFB71C1C)),
+                .background(Color(0xFFB71C1C).copy(alpha = alpha)),
             contentAlignment = Alignment.Center
         ) {
             Text("🔥", fontSize = 14.sp)
@@ -466,19 +475,19 @@ fun FireAlertPin() {
 // ── 新聞確認事件 Pin（菱形外框區別民眾回報）────────────────────────────────────
 
 @Composable
-fun NewsEventPin(color: Color) {
+fun NewsEventPin(color: Color, alpha: Float = 1f) {
     Box(contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
                 .size(32.dp)
                 .clip(CircleShape)
-                .background(color.copy(alpha = 0.20f))
+                .background(color.copy(alpha = 0.20f * alpha))
         )
         Box(
             modifier = Modifier
                 .size(20.dp)
                 .clip(CircleShape)
-                .background(color),
+                .background(color.copy(alpha = alpha)),
             contentAlignment = Alignment.Center
         ) {
             Text("📰", fontSize = 10.sp)
@@ -489,19 +498,19 @@ fun NewsEventPin(color: Color) {
 // ── 個別回報小 Pin ─────────────────────────────────────────────────────────────
 
 @Composable
-fun ReportPin(color: Color) {
+fun ReportPin(color: Color, alpha: Float = 1f) {
     Box(contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
                 .size(30.dp)
                 .clip(CircleShape)
-                .background(color.copy(alpha = 0.22f))
+                .background(color.copy(alpha = 0.22f * alpha))
         )
         Box(
             modifier = Modifier
                 .size(18.dp)
                 .clip(CircleShape)
-                .background(color)
+                .background(color.copy(alpha = alpha))
         )
     }
 }

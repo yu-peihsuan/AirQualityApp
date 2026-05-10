@@ -70,8 +70,10 @@ fun HomeScreen(
     val context = LocalContext.current
 
     // 監聽來自 ViewModel 的狀態變化
-    val uiState    by viewModel.uiState.collectAsState()
-    val isRaining  by viewModel.isRaining.collectAsState()
+    val uiState             by viewModel.uiState.collectAsState()
+    val isRaining           by viewModel.isRaining.collectAsState()
+    val currentLocationName by viewModel.currentLocationName.collectAsState()
+    var showLocationDialog  by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // 管理當前顯示的日期，讓它可以在回到畫面時更新
@@ -139,8 +141,47 @@ fun HomeScreen(
         HomeAppHeader(
             location = locationText,
             date = currentDateString,
-            onBellClick = {}
+            currentLocationName = currentLocationName,
+            onLocationSwitchClick = { showLocationDialog = true }
         )
+
+        // ── 地點切換 Dialog ──────────────────────────────────────────────
+        if (showLocationDialog) {
+            val prefs = context.getSharedPreferences("health_profile", android.content.Context.MODE_PRIVATE)
+            val favLocations = listOf(1, 2, 3).mapNotNull { i ->
+                val name    = prefs.getString("fav_${i}_name",    "")?.trim() ?: ""
+                val address = prefs.getString("fav_${i}_address", "")?.trim() ?: ""
+                if (name.isNotEmpty() && address.isNotEmpty()) Pair(name, address) else null
+            }
+
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showLocationDialog = false },
+                containerColor = BgMain,
+                title = { Text("切換地點", fontWeight = FontWeight.Bold, color = TextDark) },
+                text = {
+                    androidx.compose.foundation.layout.Column(
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+                    ) {
+                        LocationOption("📍", "GPS 定位", "自動偵測目前位置") {
+                            showLocationDialog = false
+                            viewModel.switchToGps(context)
+                        }
+                        favLocations.forEach { (name, address) ->
+                            LocationOption("📌", name, address) {
+                                showLocationDialog = false
+                                viewModel.switchToSavedLocation(name, address)
+                            }
+                        }
+                        if (favLocations.isEmpty()) {
+                            Text("尚未設定常用地點，請至「設定」頁面新增。",
+                                color = TextGray, fontSize = 13.sp,
+                                modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
+                        }
+                    }
+                },
+                confirmButton = {}
+            )
+        }
 
         // ── 主內容 ─────────────────────────────────────────────
         Column(
@@ -443,6 +484,27 @@ fun fetchWithGps(context: Context, viewModel: HomeViewModel) {
         .addOnFailureListener {
             viewModel.fetchAirQuality(context, "台北市")
         }
+}
+
+// ── 地點選項 ──────────────────────────────────────────────────────────────────
+
+@Composable
+private fun LocationOption(emoji: String, name: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(emoji, fontSize = 22.sp)
+        Spacer(androidx.compose.ui.Modifier.width(12.dp))
+        Column {
+            Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextDark)
+            Text(subtitle, fontSize = 12.sp, color = TextGray)
+        }
+    }
 }
 
 // ── 行動建議資料類別 ──────────────────────────────────────────────────────────
