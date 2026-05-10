@@ -231,16 +231,24 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(50.dp)) // 增加臉與下方按鈕的間距
 
-                    // ── 行動按鈕 ─────────────────────────────────────
+                    // ── 行動按鈕（依 AQI 等級與健康檔案隨機抽 3 個）────
+                    val currentAqiInt = aqiValue.toIntOrNull() ?: 0
+                    val prefs = context.getSharedPreferences("health_profile", android.content.Context.MODE_PRIVATE)
+                    val conditions = (prefs.getString("health_conditions", "") ?: "").split(",")
+                    val hasAsthma        = "氣喘" in conditions
+                    val hasCardiovascular = "心血管疾病" in conditions
+                    val aqiBand = when {
+                        currentAqiInt <= 50  -> 0
+                        currentAqiInt <= 100 -> 1
+                        currentAqiInt <= 150 -> 2
+                        else                 -> 3
+                    }
+                    val chips = remember(aqiBand, hasAsthma, hasCardiovascular) {
+                        getActionChips(aqiBand, hasAsthma, hasCardiovascular)
+                    }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        val currentAqiInt = aqiValue.toIntOrNull() ?: 0
-                        if (currentAqiInt > 90) {
-                            ActionChip(R.drawable.mask, "外出戴口罩", aqiColor)
-                            ActionChip(R.drawable.window, "關閉門窗", aqiColor)
-                            ActionChip(R.drawable.air_purifier, "空氣清淨機", aqiColor)
-                        } else {
-                            ActionChip(R.drawable.bicycle, "戶外活動", aqiColor)
-                            ActionChip(R.drawable.open_window, "開窗通風", aqiColor)
+                        chips.forEach { (icon, label) ->
+                            ActionChip(icon, label, aqiColor)
                         }
                     }
                 }
@@ -434,6 +442,66 @@ fun fetchWithGps(context: Context, viewModel: HomeViewModel) {
         .addOnFailureListener {
             viewModel.fetchAirQuality(context, "台北市")
         }
+}
+
+// ── 行動建議資料類別 ──────────────────────────────────────────────────────────
+
+private data class ChipItem(val icon: Int, val label: String)
+
+private fun getActionChips(
+    aqiBand: Int,
+    hasAsthma: Boolean,
+    hasCardiovascular: Boolean
+): List<ChipItem> {
+    val pool = mutableListOf<ChipItem>()
+    when (aqiBand) {
+        0 -> {
+            // AQI ≤ 50 良好：戶外活動
+            pool += listOf(
+                ChipItem(R.drawable.jogging,         "慢跑健行"),
+                ChipItem(R.drawable.walking_outside, "戶外散步"),
+                ChipItem(R.drawable.bicycle,         "騎腳踏車"),
+                ChipItem(R.drawable.open_window,     "開窗通風"),
+            )
+        }
+        1 -> {
+            // AQI 51–100 普通：輕度戶外 + 通風補水
+            pool += listOf(
+                ChipItem(R.drawable.walking_outside, "輕鬆散步"),
+                ChipItem(R.drawable.open_window,     "適度通風"),
+                ChipItem(R.drawable.drink_water,     "補充水分"),
+                ChipItem(R.drawable.alarm,           "關注空品"),
+            )
+        }
+        2 -> {
+            // AQI 101–150 敏感族群不健康：防護 + 室內活動
+            pool += listOf(
+                ChipItem(R.drawable.mask,             "外出戴口罩"),
+                ChipItem(R.drawable.window,           "關閉門窗"),
+                ChipItem(R.drawable.home,             "減少外出"),
+                ChipItem(R.drawable.drink_water,      "補充水分"),
+                ChipItem(R.drawable.excercise_inside, "室內運動"),
+                ChipItem(R.drawable.yoga,             "瑜珈伸展"),
+                ChipItem(R.drawable.public_transport, "搭大眾運輸"),
+            )
+            if (hasAsthma)         pool += ChipItem(R.drawable.inhaler,  "備妥吸入器")
+            if (hasCardiovascular) pool += ChipItem(R.drawable.medicine,  "備妥藥物")
+        }
+        else -> {
+            // AQI > 150 所有人不健康：嚴格防護
+            pool += listOf(
+                ChipItem(R.drawable.mask,             "外出戴口罩"),
+                ChipItem(R.drawable.window,           "緊閉門窗"),
+                ChipItem(R.drawable.air_purifier,     "空氣清淨機"),
+                ChipItem(R.drawable.home,             "盡量待室內"),
+                ChipItem(R.drawable.drink_water,      "多補充水分"),
+                ChipItem(R.drawable.public_transport, "搭大眾運輸"),
+            )
+            if (hasAsthma)         pool += ChipItem(R.drawable.inhaler,  "備妥吸入器")
+            if (hasCardiovascular) pool += ChipItem(R.drawable.medicine,  "備妥藥物")
+        }
+    }
+    return pool.shuffled().take(3)
 }
 
 //取得當下時間
