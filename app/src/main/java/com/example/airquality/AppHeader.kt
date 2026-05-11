@@ -110,7 +110,7 @@ fun HomeAppHeader(
             }
 
             androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(id = R.drawable.location),
+                painter = androidx.compose.ui.res.painterResource(id = R.drawable.location_add),
                 contentDescription = "常用地點",
                 modifier = Modifier
                     .size(30.dp)

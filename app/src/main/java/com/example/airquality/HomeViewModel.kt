@@ -118,8 +118,8 @@ class HomeViewModel : ViewModel() {
                 _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, region)
                 _userLat = location.latitude
                 _userLng = location.longitude
-                // GPS 縣市確認後，上傳 FCM Token 給後端
-                TokenManager.uploadTokenWithCounty(context, nearestAqi.county)
+                // GPS 縣市確認後，上傳 FCM Token（含座標與健康狀況）給後端
+                TokenManager.uploadTokenWithCounty(context, nearestAqi.county, location.latitude, location.longitude)
                 // 抓即時天氣（判斷是否下雨，供首頁圖示使用）
                 try {
                     val weather = RetrofitClient.apiService.getWeather(

@@ -134,8 +134,11 @@ data class WeatherResponse(
 // ── FCM Token 註冊 資料結構 ───────────────────────────────────────────────────
 
 data class FcmTokenRequest(
-    val token: String,
-    val county: String = ""
+    val token:      String,
+    val county:     String = "",
+    val lat:        Double? = null,
+    val lng:        Double? = null,
+    val conditions: String = ""
 )
 
 data class FcmTokenResponse(
