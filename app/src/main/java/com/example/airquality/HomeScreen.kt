@@ -64,7 +64,6 @@ import java.util.Calendar
 
 @Composable
 fun HomeScreen(
-    // 注入 ViewModel 來管理狀態
     viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -141,7 +140,6 @@ fun HomeScreen(
         HomeAppHeader(
             location = locationText,
             date = currentDateString,
-            currentLocationName = currentLocationName,
             onLocationSwitchClick = { showLocationDialog = true }
         )
 
@@ -491,20 +489,15 @@ fun fetchWithGps(context: Context, viewModel: HomeViewModel) {
 
 @Composable
 private fun LocationOption(emoji: String, name: String, subtitle: String, onClick: () -> Unit) {
-    Row(
+    Column(
         modifier = androidx.compose.ui.Modifier
             .fillMaxWidth()
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
             .clickable { onClick() }
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 4.dp, vertical = 10.dp)
     ) {
-        Text(emoji, fontSize = 22.sp)
-        Spacer(androidx.compose.ui.Modifier.width(12.dp))
-        Column {
-            Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextDark)
-            Text(subtitle, fontSize = 12.sp, color = TextGray)
-        }
+        Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextDark)
+        Text(subtitle, fontSize = 12.sp, color = TextGray)
     }
 }
 

@@ -3,6 +3,8 @@ package com.example.airquality
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,14 +78,16 @@ fun AppHeader(
 }
 
 /**
- * 首頁專用 Header：左側顯示位置與日期，右側顯示地點切換鈕
+ * 首頁專用 Header：左側顯示位置與日期，右側顯示地點切換鈕與通知鈴鐺（含 badge）
  */
 @Composable
 fun HomeAppHeader(
     location: String,
     date: String,
     currentLocationName: String = "GPS 定位",
-    onLocationSwitchClick: () -> Unit = {}
+    unreadCount: Int = 0,
+    onLocationSwitchClick: () -> Unit = {},
+    onBellClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -101,25 +105,17 @@ fun HomeAppHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.location),
-                        contentDescription = "Location",
-                        modifier = Modifier.size(20.dp),
-                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(HeaderText)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(location, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = HeaderText)
-                }
-                Text(date, color = TextGray, fontSize = 15.sp, modifier = Modifier.padding(start = 26.dp))
+                Text(location, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = HeaderText)
+                Text(date, color = TextGray, fontSize = 15.sp)
             }
-            Text(
-                "▼",
-                fontSize = 18.sp,
-                color = OrangeMain,
+
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = R.drawable.location),
+                contentDescription = "常用地點",
                 modifier = Modifier
-                    .clickable { onLocationSwitchClick() }
-                    .padding(8.dp)
+                    .size(30.dp)
+                    .clickable { onLocationSwitchClick() },
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(OrangeMain)
             )
         }
 
