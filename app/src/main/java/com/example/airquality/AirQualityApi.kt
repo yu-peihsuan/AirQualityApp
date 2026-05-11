@@ -182,7 +182,11 @@ interface AirQualityApiService {
     suspend fun getForecast(@Query("county") county: String? = null): NewsResponse
 
     @GET("api/weather")
-    suspend fun getWeather(@Query("county") county: String? = null): WeatherResponse
+    suspend fun getWeather(
+        @Query("county") county: String? = null,
+        @Query("lat") lat: Double? = null,
+        @Query("lng") lng: Double? = null
+    ): WeatherResponse
 
     @GET("api/user_reports/history")
     suspend fun getUserReportsHistory(): NewsResponse

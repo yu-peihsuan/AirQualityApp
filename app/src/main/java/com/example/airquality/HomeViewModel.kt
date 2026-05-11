@@ -61,7 +61,11 @@ class HomeViewModel : ViewModel() {
                 _userLat = lat
                 _userLng = lng
                 try {
-                    val weather = RetrofitClient.apiService.getWeather(nearestAqi.county)
+                    val weather = RetrofitClient.apiService.getWeather(
+                        county = nearestAqi.county,
+                        lat    = lat,
+                        lng    = lng
+                    )
                     _isRaining.value = weather.isRaining
                 } catch (e: Exception) { _isRaining.value = false }
             } catch (e: Exception) {
@@ -118,7 +122,11 @@ class HomeViewModel : ViewModel() {
                 TokenManager.uploadTokenWithCounty(context, nearestAqi.county)
                 // 抓即時天氣（判斷是否下雨，供首頁圖示使用）
                 try {
-                    val weather = RetrofitClient.apiService.getWeather(nearestAqi.county)
+                    val weather = RetrofitClient.apiService.getWeather(
+                        county = nearestAqi.county,
+                        lat    = location.latitude,
+                        lng    = location.longitude
+                    )
                     _isRaining.value = weather.isRaining
                 } catch (e: Exception) {
                     _isRaining.value = false

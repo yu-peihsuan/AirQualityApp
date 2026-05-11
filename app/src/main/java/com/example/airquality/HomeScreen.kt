@@ -148,7 +148,8 @@ fun HomeScreen(
         // ── 地點切換 Dialog ──────────────────────────────────────────────
         if (showLocationDialog) {
             val prefs = context.getSharedPreferences("health_profile", android.content.Context.MODE_PRIVATE)
-            val favLocations = listOf(1, 2, 3).mapNotNull { i ->
+            val count = prefs.getInt("fav_count", 0)
+            val favLocations = (1..count).mapNotNull { i ->
                 val name    = prefs.getString("fav_${i}_name",    "")?.trim() ?: ""
                 val address = prefs.getString("fav_${i}_address", "")?.trim() ?: ""
                 if (name.isNotEmpty() && address.isNotEmpty()) Pair(name, address) else null
