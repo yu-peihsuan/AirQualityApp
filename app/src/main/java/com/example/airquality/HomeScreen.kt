@@ -216,7 +216,23 @@ fun HomeScreen(
                 is AqiUiState.Success -> {
                     val successState = uiState as AqiUiState.Success
                     val nearestRecord = successState.nearestRecord
-                    
+
+                    if (successState.isFromCache) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFFFF3CD), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                "⚠ 網路連線異常，顯示暫存資料",
+                                fontSize = 12.sp,
+                                color = Color(0xFF856404)
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
                     val aqiValue = nearestRecord.aqi
                     val aqiStatus = nearestRecord.status
                     val aqiColor = getAqiColor(aqiStatus)
