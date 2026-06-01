@@ -452,7 +452,7 @@ fun ActionChip(iconRes: Int, label: String, color: Color) {
             colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black) // 圖片固定用黑色
         )
         Spacer(Modifier.height(12.dp))
-        Text(label, color = color, fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center) // 改為 AQI 文字顏色
+        Text(label, color = Color(0xFF444444), fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
     }
 }
 

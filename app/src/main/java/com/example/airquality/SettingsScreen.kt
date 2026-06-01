@@ -90,7 +90,7 @@ fun SettingsScreen() {
                 SettingSection("帳號管理") {
                     SettingInfoRow("個人帳號",   "abc123@gmail.com")
                     HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
-                    SettingInfoRow("使用者名稱", "abc123")
+                    SettingInfoRow("使用者名稱", "abc1234")
                 }
 
                 Spacer(Modifier.height(20.dp))

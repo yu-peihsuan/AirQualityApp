@@ -31,6 +31,15 @@ sealed class RagAdviceUiState {
     data class Error(val message: String) : RagAdviceUiState()
 }
 
+// 跨 ViewModel 共用的位置狀態：手動切換或 GPS 後統一更新
+object AppLocationState {
+    private val _selectedLatLng = MutableStateFlow<Pair<Double, Double>?>(null)
+    val selectedLatLng: StateFlow<Pair<Double, Double>?> = _selectedLatLng.asStateFlow()
+
+    fun update(lat: Double, lng: Double) { _selectedLatLng.value = Pair(lat, lng) }
+    fun resetToGps() { _selectedLatLng.value = null }
+}
+
 class HomeViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<AqiUiState>(AqiUiState.Loading)
@@ -60,6 +69,7 @@ class HomeViewModel : ViewModel() {
                 _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, address)
                 _userLat = lat
                 _userLng = lng
+                AppLocationState.update(lat, lng)
                 try {
                     val weather = RetrofitClient.apiService.getWeather(
                         county = nearestAqi.county,
@@ -76,6 +86,7 @@ class HomeViewModel : ViewModel() {
 
     fun switchToGps(context: android.content.Context) {
         _currentLocationName.value = "GPS 定位"
+        AppLocationState.resetToGps()
         fetchWithGps(context, this)
     }
 

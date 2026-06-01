@@ -70,7 +70,12 @@ class MapViewModel : ViewModel() {
                 val fireAlertsDeferred  = async {
                     try { RetrofitClient.apiService.getFireAlerts() } catch (e: Exception) { null }
                 }
-                val locationDeferred    = async { getCurrentLocation(context) }
+                // 若使用者已手動選擇地點，直接使用該座標；否則取 GPS
+                val locationDeferred    = async {
+                    AppLocationState.selectedLatLng.value
+                        ?.let { (lat, lng) -> LatLng(lat, lng) }
+                        ?: getCurrentLocation(context)
+                }
 
                 val hotspots     = hotspotsDeferred.await().hotspots
                 val reports      = reportsDeferred.await().records.filter {
@@ -196,6 +201,7 @@ fun MapScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val selectedLatLng by AppLocationState.selectedLatLng.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.fetchMapData(context) }
 
@@ -204,7 +210,7 @@ fun MapScreen(
         position = CameraPosition.fromLatLngZoom(taiwan, 7f)
     }
 
-    // 取得使用者位置後聚焦鏡頭
+    // 取得使用者位置後聚焦鏡頭（初次載入）
     LaunchedEffect(uiState) {
         if (uiState is MapUiState.Success) {
             val loc = (uiState as MapUiState.Success).userLocation
@@ -213,6 +219,13 @@ fun MapScreen(
                     CameraUpdateFactory.newLatLngZoom(loc, 13f)
                 )
             }
+        }
+    }
+
+    // 地圖已開著時，使用者切換地點也能即時移動鏡頭
+    LaunchedEffect(selectedLatLng) {
+        selectedLatLng?.let { (lat, lng) ->
+            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(lat, lng), 13f))
         }
     }
 
