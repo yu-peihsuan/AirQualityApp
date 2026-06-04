@@ -64,13 +64,15 @@ import java.util.Calendar
 
 @Composable
 fun HomeScreen(
-    // 注入 ViewModel 來管理狀態
     viewModel: HomeViewModel = viewModel()
 ) {
     val context = LocalContext.current
 
     // 監聽來自 ViewModel 的狀態變化
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState             by viewModel.uiState.collectAsState()
+    val isRaining           by viewModel.isRaining.collectAsState()
+    val currentLocationName by viewModel.currentLocationName.collectAsState()
+    var showLocationDialog  by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // 管理當前顯示的日期，讓它可以在回到畫面時更新
@@ -138,8 +140,47 @@ fun HomeScreen(
         HomeAppHeader(
             location = locationText,
             date = currentDateString,
-            onBellClick = {}
+            onLocationSwitchClick = { showLocationDialog = true }
         )
+
+        // ── 地點切換 Dialog ──────────────────────────────────────────────
+        if (showLocationDialog) {
+            val prefs = context.getSharedPreferences("health_profile", android.content.Context.MODE_PRIVATE)
+            val count = prefs.getInt("fav_count", 0)
+            val favLocations = (1..count).mapNotNull { i ->
+                val name    = prefs.getString("fav_${i}_name",    "")?.trim() ?: ""
+                val address = prefs.getString("fav_${i}_address", "")?.trim() ?: ""
+                if (name.isNotEmpty() && address.isNotEmpty()) Pair(name, address) else null
+            }
+
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showLocationDialog = false },
+                containerColor = BgMain,
+                title = { Text("切換地點", fontWeight = FontWeight.Bold, color = TextDark) },
+                text = {
+                    androidx.compose.foundation.layout.Column(
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+                    ) {
+                        LocationOption("📍", "GPS 定位", "自動偵測目前位置") {
+                            showLocationDialog = false
+                            viewModel.switchToGps(context)
+                        }
+                        favLocations.forEach { (name, address) ->
+                            LocationOption("📌", name, address) {
+                                showLocationDialog = false
+                                viewModel.switchToSavedLocation(name, address)
+                            }
+                        }
+                        if (favLocations.isEmpty()) {
+                            Text("尚未設定常用地點，請至「設定」頁面新增。",
+                                color = TextGray, fontSize = 13.sp,
+                                modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
+                        }
+                    }
+                },
+                confirmButton = {}
+            )
+        }
 
         // ── 主內容 ─────────────────────────────────────────────
         Column(
@@ -175,7 +216,23 @@ fun HomeScreen(
                 is AqiUiState.Success -> {
                     val successState = uiState as AqiUiState.Success
                     val nearestRecord = successState.nearestRecord
-                    
+
+                    if (successState.isFromCache) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFFFF3CD), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                "⚠ 網路連線異常，顯示暫存資料",
+                                fontSize = 12.sp,
+                                color = Color(0xFF856404)
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
                     val aqiValue = nearestRecord.aqi
                     val aqiStatus = nearestRecord.status
                     val aqiColor = getAqiColor(aqiStatus)
@@ -231,16 +288,24 @@ fun HomeScreen(
 
                     Spacer(Modifier.height(50.dp)) // 增加臉與下方按鈕的間距
 
-                    // ── 行動按鈕 ─────────────────────────────────────
+                    // ── 行動按鈕（依 AQI 等級與健康檔案隨機抽 3 個）────
+                    val currentAqiInt = aqiValue.toIntOrNull() ?: 0
+                    val prefs = context.getSharedPreferences("health_profile", android.content.Context.MODE_PRIVATE)
+                    val conditions = (prefs.getString("health_conditions", "") ?: "").split(",")
+                    val hasAsthma        = "氣喘" in conditions
+                    val hasCardiovascular = "心血管疾病" in conditions
+                    val aqiBand = when {
+                        currentAqiInt <= 50  -> 0
+                        currentAqiInt <= 100 -> 1
+                        currentAqiInt <= 150 -> 2
+                        else                 -> 3
+                    }
+                    val chips = remember(aqiBand, hasAsthma, hasCardiovascular, isRaining) {
+                        getActionChips(aqiBand, hasAsthma, hasCardiovascular, isRaining)
+                    }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        val currentAqiInt = aqiValue.toIntOrNull() ?: 0
-                        if (currentAqiInt > 90) {
-                            ActionChip(R.drawable.mask, "外出戴口罩", aqiColor)
-                            ActionChip(R.drawable.window, "關閉門窗", aqiColor)
-                            ActionChip(R.drawable.air_purifier, "空氣清淨機", aqiColor)
-                        } else {
-                            ActionChip(R.drawable.bicycle, "戶外活動", aqiColor)
-                            ActionChip(R.drawable.open_window, "開窗通風", aqiColor)
+                        chips.forEach { (icon, label) ->
+                            ActionChip(icon, label, aqiColor)
                         }
                     }
                 }
@@ -403,7 +468,7 @@ fun ActionChip(iconRes: Int, label: String, color: Color) {
             colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black) // 圖片固定用黑色
         )
         Spacer(Modifier.height(12.dp))
-        Text(label, color = color, fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center) // 改為 AQI 文字顏色
+        Text(label, color = Color(0xFF666666), fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
     }
 }
 
@@ -434,6 +499,97 @@ fun fetchWithGps(context: Context, viewModel: HomeViewModel) {
         .addOnFailureListener {
             viewModel.fetchAirQuality(context, "台北市")
         }
+}
+
+// ── 地點選項 ──────────────────────────────────────────────────────────────────
+
+@Composable
+private fun LocationOption(emoji: String, name: String, subtitle: String, onClick: () -> Unit) {
+    Column(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 4.dp, vertical = 10.dp)
+    ) {
+        Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextDark)
+        Text(subtitle, fontSize = 12.sp, color = TextGray)
+    }
+}
+
+// ── 行動建議資料類別 ──────────────────────────────────────────────────────────
+
+private data class ChipItem(val icon: Int, val label: String, val category: String = label)
+
+private fun getActionChips(
+    aqiBand: Int,
+    hasAsthma: Boolean,
+    hasCardiovascular: Boolean,
+    isRaining: Boolean = false
+): List<ChipItem> {
+    val pool = mutableListOf<ChipItem>()
+    when (aqiBand) {
+        0 -> {
+            if (isRaining) {
+                pool += listOf(
+                    ChipItem(R.drawable.excercise_inside, "室內運動",  "indoor_exercise"),
+                    ChipItem(R.drawable.yoga,             "瑜珈伸展",  "indoor_exercise"),
+                    ChipItem(R.drawable.open_window,      "開窗通風",  "ventilation"),
+                )
+            } else {
+                pool += listOf(
+                    ChipItem(R.drawable.jogging,         "戶外跑步",  "outdoor_exercise"),
+                    ChipItem(R.drawable.walking_outside, "戶外散步",  "outdoor_exercise"),
+                    ChipItem(R.drawable.bicycle,         "騎腳踏車",  "cycling"),
+                    ChipItem(R.drawable.open_window,     "開窗通風",  "ventilation"),
+                )
+            }
+        }
+        1 -> {
+            if (isRaining) {
+                pool += listOf(
+                    ChipItem(R.drawable.excercise_inside, "室內運動",  "indoor_exercise"),
+                    ChipItem(R.drawable.yoga,             "瑜珈伸展",  "indoor_exercise"),
+                    ChipItem(R.drawable.drink_water,      "補充水分",  "hydration"),
+                    ChipItem(R.drawable.air_purifier,     "空氣清淨機","air_purifier"),
+                )
+            } else {
+                pool += listOf(
+                    ChipItem(R.drawable.walking_outside, "戶外散步",  "outdoor_exercise"),
+                    ChipItem(R.drawable.open_window,     "開窗通風",  "ventilation"),
+                    ChipItem(R.drawable.drink_water,     "補充水分",  "hydration"),
+                    ChipItem(R.drawable.air_purifier,    "空氣清淨機","air_purifier"),
+                )
+            }
+        }
+        2 -> {
+            pool += listOf(
+                ChipItem(R.drawable.mask,             "戴口罩",    "mask"),
+                ChipItem(R.drawable.window,           "關閉門窗",  "close_window"),
+                ChipItem(R.drawable.stay_at_home,     "減少外出",  "stay_inside"),
+                ChipItem(R.drawable.drink_water,      "補充水分",  "hydration"),
+                ChipItem(R.drawable.excercise_inside, "室內運動",  "indoor_exercise"),
+                ChipItem(R.drawable.yoga,             "瑜珈伸展",  "indoor_exercise"),
+                ChipItem(R.drawable.public_transport, "搭大眾運輸","transport"),
+                ChipItem(R.drawable.air_purifier,     "空氣清淨機","air_purifier"),
+            )
+            if (hasAsthma)         pool += ChipItem(R.drawable.inhaler, "備妥吸入器", "inhaler")
+            if (hasCardiovascular) pool += ChipItem(R.drawable.medicine, "備妥藥物",  "medicine")
+        }
+        else -> {
+            pool += listOf(
+                ChipItem(R.drawable.mask,             "戴口罩",    "mask"),
+                ChipItem(R.drawable.window,           "關閉門窗",  "close_window"),
+                ChipItem(R.drawable.air_purifier,     "空氣清淨機","air_purifier"),
+                ChipItem(R.drawable.home,             "盡量待室內","stay_inside"),
+                ChipItem(R.drawable.drink_water,      "多補充水分","hydration"),
+                ChipItem(R.drawable.public_transport, "搭大眾運輸","transport"),
+            )
+            if (hasAsthma)         pool += ChipItem(R.drawable.inhaler, "備妥吸入器", "inhaler")
+            if (hasCardiovascular) pool += ChipItem(R.drawable.medicine, "備妥藥物",  "medicine")
+        }
+    }
+    return pool.shuffled().distinctBy { it.category }.take(3)
 }
 
 //取得當下時間

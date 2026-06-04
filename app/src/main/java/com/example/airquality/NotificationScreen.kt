@@ -83,10 +83,12 @@ private fun cardContent(item: NewsRecord, group: NotifGroup): Pair<String, Strin
         item.title.ifBlank { "重大火災" },
         item.summary.ifBlank { item.region }
     )
-    NotifGroup.REPORT -> Pair(
-        eventLabel(item.structuredEvent?.eventType ?: item.category),
-        item.summary.take(50).ifBlank { item.region }
-    )
+    NotifGroup.REPORT -> {
+        val label  = eventLabel(item.structuredEvent?.eventType ?: item.category)
+        val region = item.region
+        val title  = if (region.isNotBlank()) "$label・$region" else label
+        Pair(title, item.summary.take(40))
+    }
     NotifGroup.AQI      -> Pair(
         item.title,
         item.summary.ifBlank { item.region }

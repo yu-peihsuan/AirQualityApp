@@ -19,7 +19,8 @@ sealed class AqiUiState {
     data class Success(
         val data: AirQualityResponse,
         val nearestRecord: AqiRecord,
-        val displayRegion: String
+        val displayRegion: String,
+        val isFromCache: Boolean = false
     ) : AqiUiState()
     data class Error(val message: String) : AqiUiState()
 }
@@ -31,13 +32,76 @@ sealed class RagAdviceUiState {
     data class Error(val message: String) : RagAdviceUiState()
 }
 
+// 跨 ViewModel 共用的位置狀態：手動切換或 GPS 後統一更新
+object AppLocationState {
+    private val _selectedLatLng = MutableStateFlow<Pair<Double, Double>?>(null)
+    val selectedLatLng: StateFlow<Pair<Double, Double>?> = _selectedLatLng.asStateFlow()
+
+    fun update(lat: Double, lng: Double) { _selectedLatLng.value = Pair(lat, lng) }
+    fun resetToGps() { _selectedLatLng.value = null }
+}
+
 class HomeViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<AqiUiState>(AqiUiState.Loading)
     val uiState: StateFlow<AqiUiState> = _uiState.asStateFlow()
 
-private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
+    private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
     val ragAdviceState: StateFlow<RagAdviceUiState> = _ragAdviceState.asStateFlow()
+
+    private val _isRaining = MutableStateFlow(false)
+    val isRaining: StateFlow<Boolean> = _isRaining.asStateFlow()
+
+    private val _currentLocationName = MutableStateFlow("GPS 定位")
+    val currentLocationName: StateFlow<String> = _currentLocationName.asStateFlow()
+
+    // 記憶體快取：最後一次成功的 AQI 狀態，供 API 失敗時備援
+    private var _lastSuccessState: AqiUiState.Success? = null
+
+    fun switchToSavedLocation(name: String, address: String) {
+        viewModelScope.launch {
+            _uiState.value = AqiUiState.Loading
+            _currentLocationName.value = name
+            try {
+                val coords = googleForwardGeocode(address)
+                val lat = coords?.first ?: 25.032969
+                val lng = coords?.second ?: 121.516039
+                val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
+                val aqiRecords  = aqiResponse.records ?: emptyList()
+                if (aqiRecords.isEmpty()) throw Exception("沒有取得 AQI 資料")
+                val nearestAqi = findNearestStation(aqiRecords, lat, lng)
+                val isCache = aqiResponse.status == "cached"
+                val successState = AqiUiState.Success(aqiResponse, nearestAqi, address, isCache)
+                _lastSuccessState = successState
+                _uiState.value = successState
+                _userLat = lat
+                _userLng = lng
+                AppLocationState.update(lat, lng)
+                try {
+                    val weather = RetrofitClient.apiService.getWeather(
+                        county = nearestAqi.county,
+                        lat    = lat,
+                        lng    = lng
+                    )
+                    _isRaining.value = weather.isRaining
+                } catch (e: Exception) { _isRaining.value = false }
+            } catch (e: Exception) {
+                val cached = _lastSuccessState
+                if (cached != null) {
+                    Log.w("HomeViewModel", "switchToSavedLocation 失敗，使用快取: ${e.localizedMessage}")
+                    _uiState.value = cached.copy(isFromCache = true)
+                } else {
+                    _uiState.value = AqiUiState.Error("地點切換失敗: ${e.localizedMessage}")
+                }
+            }
+        }
+    }
+
+    fun switchToGps(context: android.content.Context) {
+        _currentLocationName.value = "GPS 定位"
+        AppLocationState.resetToGps()
+        fetchWithGps(context, this)
+    }
 
     // GPS 座標（由 fetchAirQualityByLocation 設定，供下風處判斷使用）
     private var _userLat: Double? = null
@@ -53,11 +117,20 @@ private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiStat
 
                 val (lat, lng, displayRegion) = getCoordinates(context, address)
                 val nearestAqi = findNearestStation(aqiRecords, lat, lng)
-                _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, displayRegion)
+                val isCache = aqiResponse.status == "cached"
+                val successState = AqiUiState.Success(aqiResponse, nearestAqi, displayRegion, isCache)
+                _lastSuccessState = successState
+                _uiState.value = successState
 
             } catch (e: Exception) {
-                _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
                 Log.e("HomeViewModel", "fetchAirQuality failed", e)
+                val cached = _lastSuccessState
+                if (cached != null) {
+                    Log.w("HomeViewModel", "使用 AQI 快取資料")
+                    _uiState.value = cached.copy(isFromCache = true)
+                } else {
+                    _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
+                }
             }
         }
     }
@@ -75,15 +148,35 @@ private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiStat
                 if (aqiRecords.isEmpty()) throw Exception("沒有取得 AQI 資料")
 
                 val nearestAqi = findNearestStation(aqiRecords, location.latitude, location.longitude)
-                _uiState.value = AqiUiState.Success(aqiResponse, nearestAqi, region)
+                val isCache = aqiResponse.status == "cached"
+                val successState = AqiUiState.Success(aqiResponse, nearestAqi, region, isCache)
+                _lastSuccessState = successState
+                _uiState.value = successState
                 _userLat = location.latitude
                 _userLng = location.longitude
-                // GPS 縣市確認後，上傳 FCM Token 給後端
-                TokenManager.uploadTokenWithCounty(context, nearestAqi.county)
+                // GPS 縣市確認後，上傳 FCM Token（含座標與健康狀況）給後端
+                TokenManager.uploadTokenWithCounty(context, nearestAqi.county, location.latitude, location.longitude)
+                // 抓即時天氣（判斷是否下雨，供首頁圖示使用）
+                try {
+                    val weather = RetrofitClient.apiService.getWeather(
+                        county = nearestAqi.county,
+                        lat    = location.latitude,
+                        lng    = location.longitude
+                    )
+                    _isRaining.value = weather.isRaining
+                } catch (e: Exception) {
+                    _isRaining.value = false
+                }
 
             } catch (e: Exception) {
-                _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
                 Log.e("HomeViewModel", "fetchAirQualityByLocation failed", e)
+                val cached = _lastSuccessState
+                if (cached != null) {
+                    Log.w("HomeViewModel", "使用 AQI 快取資料（GPS 定位失敗）")
+                    _uiState.value = cached.copy(isFromCache = true)
+                } else {
+                    _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
+                }
             }
         }
     }
