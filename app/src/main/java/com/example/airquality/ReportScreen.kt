@@ -46,15 +46,20 @@ fun ReportScreen(
         if (granted) reportViewModel.fetchAddressFromGps(context)
     }
 
-    // 進入畫面時請求定位權限，已有權限則直接定位
+    // 進入畫面時：若有手動選擇地點則用該座標填入，否則用 GPS
     LaunchedEffect(Unit) {
-        val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (hasPermission) {
-            reportViewModel.fetchAddressFromGps(context)
+        val selectedCoords = AppLocationState.selectedLatLng.value
+        if (selectedCoords != null) {
+            reportViewModel.fetchAddressFromCoords(selectedCoords.first, selectedCoords.second)
         } else {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (hasPermission) {
+                reportViewModel.fetchAddressFromGps(context)
+            } else {
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
         }
     }
 

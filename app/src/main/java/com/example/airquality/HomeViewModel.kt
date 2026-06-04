@@ -58,7 +58,22 @@ class HomeViewModel : ViewModel() {
     // 記憶體快取：最後一次成功的 AQI 狀態，供 API 失敗時備援
     private var _lastSuccessState: AqiUiState.Success? = null
 
+    // 記住手動選的地點，供 ON_RESUME 刷新時使用
+    private var _savedLocationName: String = ""
+    private var _savedLocationAddress: String = ""
+
+    val isGpsMode: Boolean
+        get() = _currentLocationName.value == "GPS 定位"
+
+    fun refreshSavedLocation() {
+        if (_savedLocationAddress.isNotEmpty()) {
+            switchToSavedLocation(_savedLocationName, _savedLocationAddress)
+        }
+    }
+
     fun switchToSavedLocation(name: String, address: String) {
+        _savedLocationName = name
+        _savedLocationAddress = address
         viewModelScope.launch {
             _uiState.value = AqiUiState.Loading
             _currentLocationName.value = name

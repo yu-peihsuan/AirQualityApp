@@ -111,7 +111,11 @@ fun HomeScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 currentDateString = getCurrentDateString()
-                fetchWithGps(context, viewModel)
+                if (viewModel.isGpsMode) {
+                    fetchWithGps(context, viewModel)
+                } else {
+                    viewModel.refreshSavedLocation()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
