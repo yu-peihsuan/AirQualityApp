@@ -46,6 +46,19 @@ class ReportViewModel : ViewModel() {
     private var cachedGpsCoords: Pair<Double, Double>? = null
     private var cachedGpsAddress: String? = null
 
+    /** 手動切換地點後，用已知座標反向地理編碼填入地址欄。 */
+    fun fetchAddressFromCoords(lat: Double, lng: Double) {
+        viewModelScope.launch {
+            _locationFetchState.value = LocationFetchState.Loading
+            val address = reverseGeocode(lat, lng)
+            if (address != null) {
+                _locationFetchState.value = LocationFetchState.Success(address)
+            } else {
+                _locationFetchState.value = LocationFetchState.Error("無法解析地址，請手動輸入")
+            }
+        }
+    }
+
     /** 使用者點「定位」按鈕 → 取得 GPS 並 Reverse Geocoding 轉為地址。 */
     fun fetchAddressFromGps(context: Context) {
         viewModelScope.launch {

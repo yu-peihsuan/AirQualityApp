@@ -253,12 +253,33 @@ fun MapScreen(
         Box(modifier = Modifier.fillMaxSize()) {
 
             // ── 地圖本體 ──────────────────────────────────────────────────────
+            // 手動選擇地點時關閉 GPS 藍點，改在選擇座標顯示自訂藍圈
+            val isGpsMode = selectedLatLng == null
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
-                properties = MapProperties(isMyLocationEnabled = true),
-                uiSettings = MapUiSettings(myLocationButtonEnabled = true)
+                properties = MapProperties(isMyLocationEnabled = isGpsMode),
+                uiSettings = MapUiSettings(myLocationButtonEnabled = isGpsMode)
             ) {
+                // 手動模式：在選擇座標畫仿 GPS 藍圈
+                selectedLatLng?.let { (lat, lng) ->
+                    val pos = com.google.android.gms.maps.model.LatLng(lat, lng)
+                    Circle(
+                        center      = pos,
+                        radius      = 80.0,
+                        fillColor   = Color(0x220088FF),
+                        strokeColor = Color(0xFF0088FF),
+                        strokeWidth = 2f
+                    )
+                    Circle(
+                        center      = pos,
+                        radius      = 20.0,
+                        fillColor   = Color(0xFF0088FF),
+                        strokeColor = Color.White,
+                        strokeWidth = 2.5f
+                    )
+                }
+
                 if (uiState is MapUiState.Success) {
                     val data = uiState as MapUiState.Success
 
