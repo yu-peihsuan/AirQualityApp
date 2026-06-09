@@ -213,12 +213,15 @@ class HomeViewModel : ViewModel() {
                     else                          -> "adult"
                 }
 
+                val otherNotes = healthPrefs.getString("health_other", "")?.ifBlank { null }
+
                 val userProfile = RagUserProfile(
-                    ageGroup        = ageGroup,
-                    isPregnant      = conditions.contains("懷孕中"),
-                    hasAsthma       = conditions.contains("氣喘") || conditions.contains("呼吸道疾病"),
+                    ageGroup          = ageGroup,
+                    isPregnant        = conditions.contains("懷孕中"),
+                    hasAsthma         = conditions.contains("氣喘") || conditions.contains("呼吸道疾病"),
                     hasCardiovascular = conditions.contains("心血管疾病") || conditions.contains("高血壓"),
-                    hasAllergy      = conditions.contains("過敏")
+                    hasAllergy        = conditions.contains("過敏"),
+                    otherNotes        = otherNotes
                 )
 
                 // 2. 取得所在縣市與 AQI（從 AQI 成功狀態取最近測站，避免重複呼叫 API）
