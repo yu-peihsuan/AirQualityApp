@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -30,14 +31,26 @@ class MainActivity : ComponentActivity() {
         TokenManager.fetchAndSaveToken(this)
         setContent {
             AirQualityTheme {
-                MainScreen()
+                AppEntry()
             }
         }
     }
 }
 
 @Composable
-fun MainScreen() {
+fun AppEntry() {
+    val context = LocalContext.current
+    var isLoggedIn by remember { mutableStateOf(UserManager.isLoggedIn(context)) }
+
+    if (!isLoggedIn) {
+        LoginScreen(onLoginSuccess = { isLoggedIn = true })
+    } else {
+        MainScreen(onLogout = { isLoggedIn = false })
+    }
+}
+
+@Composable
+fun MainScreen(onLogout: () -> Unit = {}) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val navItems = listOf(
@@ -60,7 +73,7 @@ fun MainScreen() {
                 1 -> AiHealthScreen()
                 2 -> ReportScreen()
                 3 -> NotificationScreen()
-                4 -> SettingsScreen()
+                4 -> SettingsScreen(onLogout = onLogout)
             }
         }
     }
