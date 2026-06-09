@@ -81,7 +81,8 @@ data class RagUserProfile(
     @SerializedName("is_pregnant")        val isPregnant: Boolean = false,
     @SerializedName("has_asthma")         val hasAsthma: Boolean = false,
     @SerializedName("has_cardiovascular") val hasCardiovascular: Boolean = false,
-    @SerializedName("has_allergy")        val hasAllergy: Boolean = false
+    @SerializedName("has_allergy")        val hasAllergy: Boolean = false,
+    @SerializedName("other_notes")        val otherNotes: String? = null
 )
 
 data class RagAdviceRequest(

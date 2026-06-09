@@ -29,12 +29,10 @@ fun SettingsScreen() {
     val prefs = remember { context.getSharedPreferences("health_profile", Context.MODE_PRIVATE) }
 
     // ── 健康檔案 state（從 SharedPreferences 載入）────────────────────────
-    val ageGroups       = listOf("18歲以下", "18-64歲", "65歲以上")
-    val smokingOptions  = listOf("不吸菸", "有吸菸")
-    val conditionList   = listOf("氣喘", "心血管疾病", "懷孕中", "過敏", "呼吸道疾病", "糖尿病", "腎臟病", "高血壓")
+    val ageGroups     = listOf("18歲以下", "18-64歲", "65歲以上")
+    val conditionList = listOf("氣喘", "心血管疾病", "懷孕中", "過敏", "呼吸道疾病", "高血壓")
 
     var selectedAgeGroup  by remember { mutableStateOf(prefs.getString("health_age_group", "18-64歲") ?: "18-64歲") }
-    var selectedSmoking   by remember { mutableStateOf(prefs.getString("health_smoking",   "不吸菸") ?: "不吸菸") }
     var otherText         by remember { mutableStateOf(prefs.getString("health_other",     "") ?: "") }
 
     // ── 常用地點 state ────────────────────────────────────────────────────────
@@ -133,13 +131,7 @@ fun SettingsScreen() {
 
                     Spacer(Modifier.height(16.dp))
 
-                    // 3. 吸菸習慣
-                    HealthFieldLabel("吸菸習慣")
-                    SingleSelectChipRow(smokingOptions, selectedSmoking) { selectedSmoking = it }
-
-                    Spacer(Modifier.height(16.dp))
-
-                    // 4. 其他說明
+                    // 3. 其他說明
                     HealthFieldLabel("其他說明")
                     OutlinedTextField(
                         value = otherText,
@@ -160,7 +152,6 @@ fun SettingsScreen() {
                             prefs.edit()
                                 .putString("health_age_group",  selectedAgeGroup)
                                 .putString("health_conditions", selectedConditions.joinToString(","))
-                                .putString("health_smoking",    selectedSmoking)
                                 .putString("health_other",      otherText)
                                 .apply()
                             scope.launch {
