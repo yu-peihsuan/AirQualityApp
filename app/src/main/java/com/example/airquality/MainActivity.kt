@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -30,15 +31,31 @@ class MainActivity : ComponentActivity() {
         TokenManager.fetchAndSaveToken(this)
         setContent {
             AirQualityTheme {
-                MainScreen()
+                AppEntry()
             }
         }
     }
 }
 
 @Composable
-fun MainScreen() {
-    var selectedTab by remember { mutableIntStateOf(0) }
+fun AppEntry() {
+    val context = LocalContext.current
+    var isLoggedIn by remember { mutableStateOf(UserManager.isLoggedIn(context)) }
+    var startTab by remember { mutableIntStateOf(0) }
+
+    if (!isLoggedIn) {
+        LoginScreen(onLoginSuccess = { isNewUser ->
+            startTab = if (isNewUser) 4 else 0
+            isLoggedIn = true
+        })
+    } else {
+        MainScreen(initialTab = startTab, onLogout = { isLoggedIn = false })
+    }
+}
+
+@Composable
+fun MainScreen(initialTab: Int = 0, onLogout: () -> Unit = {}) {
+    var selectedTab by remember { mutableIntStateOf(initialTab) }
 
     val navItems = listOf(
         NavItem("首頁",   R.drawable.home),
@@ -60,7 +77,7 @@ fun MainScreen() {
                 1 -> AiHealthScreen()
                 2 -> ReportScreen()
                 3 -> NotificationScreen()
-                4 -> SettingsScreen()
+                4 -> SettingsScreen(onLogout = onLogout)
             }
         }
     }

@@ -24,9 +24,10 @@ private data class FavLocation(val name: String, val address: String)
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onLogout: () -> Unit = {}) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("health_profile", Context.MODE_PRIVATE) }
+    val userEmail = remember { UserManager.getEmail(context) ?: "" }
 
     // ── 健康檔案 state（從 SharedPreferences 載入）────────────────────────
     val ageGroups     = listOf("18歲以下", "18-64歲", "65歲以上")
@@ -86,9 +87,22 @@ fun SettingsScreen() {
 
                 // ── 帳號管理 ───────────────────────────────────────────────
                 SettingSection("帳號管理") {
-                    SettingInfoRow("個人帳號",   "abc123@gmail.com")
+                    SettingInfoRow("Email", userEmail)
                     HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
-                    SettingInfoRow("使用者名稱", "abc1234")
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                UserManager.logout(context)
+                                onLogout()
+                            }
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("登出", color = RedText, fontSize = 17.sp)
+                        Text("›", color = TextGray, fontSize = 23.sp)
+                    }
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -155,7 +169,8 @@ fun SettingsScreen() {
                                 .putString("health_other",      otherText)
                                 .apply()
                             scope.launch {
-                                snackbarHostState.showSnackbar("✅ 健康檔案已儲存")
+                                UserManager.pushProfile(context)
+                                snackbarHostState.showSnackbar("✅ 健康檔案已儲存並同步")
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),

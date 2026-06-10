@@ -5,6 +5,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 import com.google.gson.annotations.SerializedName
@@ -167,6 +169,44 @@ data class HotspotResponse(
     val hotspots: List<HotspotRecord> = emptyList()
 )
 
+// ── 使用者 Auth / Profile 資料結構 ────────────────────────────────────────────
+
+data class EmailLoginRequest(
+    val email: String
+)
+
+data class UserInfo(
+    val email: String,
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class UserProfileData(
+    val email: String = "",
+    @SerializedName("age_group")     val ageGroup: String     = "18-64歲",
+    val conditions: String                                     = "",
+    @SerializedName("other_notes")   val otherNotes: String   = "",
+    @SerializedName("fav_locations") val favLocations: List<Map<String, String>> = emptyList(),
+    @SerializedName("updated_at")    val updatedAt: String    = ""
+)
+
+data class AuthResponse(
+    val status: String,
+    val user: UserInfo?,
+    val profile: UserProfileData?
+)
+
+data class ProfileResponse(
+    val status: String,
+    val profile: UserProfileData?
+)
+
+data class UserProfileRequest(
+    @SerializedName("age_group")     val ageGroup: String,
+    val conditions: String,
+    @SerializedName("other_notes")   val otherNotes: String,
+    @SerializedName("fav_locations") val favLocations: List<Map<String, String>>
+)
+
 // ── API 介面 ─────────────────────────────────────────────────────────────────
 
 interface AirQualityApiService {
@@ -210,6 +250,18 @@ interface AirQualityApiService {
         @Query("radius_km") radiusKm: Float = 1.5f,
         @Query("top_n") topN: Int = 10
     ): HotspotResponse
+
+    @POST("api/auth/login")
+    suspend fun login(@Body request: EmailLoginRequest): AuthResponse
+
+    @GET("api/users/{email}/profile")
+    suspend fun getProfile(@retrofit2.http.Path("email") email: String): ProfileResponse
+
+    @PUT("api/users/{email}/profile")
+    suspend fun updateProfile(
+        @retrofit2.http.Path("email") email: String,
+        @Body request: UserProfileRequest
+    ): ProfileResponse
 }
 
 // ── Retrofit 連線實體 ─────────────────────────────────────────────────────────
