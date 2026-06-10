@@ -41,17 +41,21 @@ class MainActivity : ComponentActivity() {
 fun AppEntry() {
     val context = LocalContext.current
     var isLoggedIn by remember { mutableStateOf(UserManager.isLoggedIn(context)) }
+    var startTab by remember { mutableIntStateOf(0) }
 
     if (!isLoggedIn) {
-        LoginScreen(onLoginSuccess = { isLoggedIn = true })
+        LoginScreen(onLoginSuccess = { isNewUser ->
+            startTab = if (isNewUser) 4 else 0
+            isLoggedIn = true
+        })
     } else {
-        MainScreen(onLogout = { isLoggedIn = false })
+        MainScreen(initialTab = startTab, onLogout = { isLoggedIn = false })
     }
 }
 
 @Composable
-fun MainScreen(onLogout: () -> Unit = {}) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+fun MainScreen(initialTab: Int = 0, onLogout: () -> Unit = {}) {
+    var selectedTab by remember { mutableIntStateOf(initialTab) }
 
     val navItems = listOf(
         NavItem("首頁",   R.drawable.home),

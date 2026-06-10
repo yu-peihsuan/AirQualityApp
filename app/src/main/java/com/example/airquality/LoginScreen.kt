@@ -21,7 +21,7 @@ import com.example.airquality.ui.theme.*
 import kotlinx.coroutines.launch
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
+fun LoginScreen(onLoginSuccess: (isNewUser: Boolean) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -43,7 +43,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             val result = UserManager.loginAndSync(context, trimmed)
             isLoading = false
             if (result.isSuccess) {
-                onLoginSuccess()
+                val isNewUser = result.getOrNull() == null
+                onLoginSuccess(isNewUser)
             } else {
                 errorMsg = "連線失敗，請確認網路後再試"
             }
