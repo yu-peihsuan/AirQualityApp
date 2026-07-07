@@ -24,10 +24,9 @@ private data class FavLocation(val name: String, val address: String)
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onLogout: () -> Unit = {}) {
+fun SettingsScreen() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("health_profile", Context.MODE_PRIVATE) }
-    val userEmail = remember { UserManager.getEmail(context) ?: "" }
 
     // ── 健康檔案 state（從 SharedPreferences 載入）────────────────────────
     val ageGroups     = listOf("18歲以下", "18-64歲", "65歲以上")
@@ -84,28 +83,6 @@ fun SettingsScreen(onLogout: () -> Unit = {}) {
                     .padding(horizontal = 20.dp)
             ) {
                 Spacer(Modifier.height(24.dp))
-
-                // ── 帳號管理 ───────────────────────────────────────────────
-                SettingSection("帳號管理") {
-                    SettingInfoRow("Email", userEmail)
-                    HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                UserManager.logout(context)
-                                onLogout()
-                            }
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("登出", color = RedText, fontSize = 17.sp)
-                        Text("›", color = TextGray, fontSize = 23.sp)
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
 
                 // ── 個人健康檔案 ───────────────────────────────────────────
                 SettingSection("個人健康檔案") {
@@ -169,8 +146,7 @@ fun SettingsScreen(onLogout: () -> Unit = {}) {
                                 .putString("health_other",      otherText)
                                 .apply()
                             scope.launch {
-                                UserManager.pushProfile(context)
-                                snackbarHostState.showSnackbar("✅ 健康檔案已儲存並同步")
+                                snackbarHostState.showSnackbar("✅ 健康檔案已儲存於本機")
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -389,20 +365,6 @@ fun SettingSection(title: String?, content: @Composable ColumnScope.() -> Unit) 
             .padding(horizontal = 16.dp, vertical = 12.dp),
         content = content
     )
-}
-
-@Composable
-fun SettingInfoRow(label: String, value: String) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, color = TextMid,  fontSize = 17.sp)
-        Text(value, color = TextGray, fontSize = 17.sp)
-    }
 }
 
 @Composable
