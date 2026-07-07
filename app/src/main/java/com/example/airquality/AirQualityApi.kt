@@ -5,6 +5,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Query
 
 import com.google.gson.annotations.SerializedName
@@ -147,6 +148,29 @@ data class FcmTokenResponse(
     val message: String
 )
 
+data class DailyNotificationRequest(
+    val token: String,
+    val enabled: Boolean,
+    val hour: Int? = null,
+    val minute: Int? = null
+)
+
+data class DailyNotificationResponse(
+    val status: String,
+    val message: String? = null
+)
+
+data class DailyNotificationTestRequest(
+    val token: String
+)
+
+data class DailyNotificationTestResponse(
+    val status: String,
+    val message: String? = null,
+    val county: String? = null,
+    val aqi: Int? = null
+)
+
 // ── GIS 熱點 資料結構 ─────────────────────────────────────────────────────────
 
 data class HotspotRecord(
@@ -203,6 +227,12 @@ interface AirQualityApiService {
 
     @POST("api/fcm/register")
     suspend fun registerFcmToken(@Body request: FcmTokenRequest): FcmTokenResponse
+
+    @PUT("api/fcm/daily-notification")
+    suspend fun setDailyNotification(@Body request: DailyNotificationRequest): DailyNotificationResponse
+
+    @POST("api/fcm/daily-notification/test")
+    suspend fun testDailyNotification(@Body request: DailyNotificationTestRequest): DailyNotificationTestResponse
 
     @GET("api/hotspots")
     suspend fun getHotspots(
