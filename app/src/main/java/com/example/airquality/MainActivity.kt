@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,22 +38,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppEntry() {
-    val context = LocalContext.current
-    var isLoggedIn by remember { mutableStateOf(UserManager.isLoggedIn(context)) }
-    var startTab by remember { mutableIntStateOf(0) }
-
-    if (!isLoggedIn) {
-        LoginScreen(onLoginSuccess = { isNewUser ->
-            startTab = if (isNewUser) 4 else 0
-            isLoggedIn = true
-        })
-    } else {
-        MainScreen(initialTab = startTab, onLogout = { isLoggedIn = false })
-    }
+    MainScreen()
 }
 
 @Composable
-fun MainScreen(initialTab: Int = 0, onLogout: () -> Unit = {}) {
+fun MainScreen(initialTab: Int = 0) {
     var selectedTab by remember { mutableIntStateOf(initialTab) }
 
     val navItems = listOf(
@@ -77,7 +65,7 @@ fun MainScreen(initialTab: Int = 0, onLogout: () -> Unit = {}) {
                 1 -> AiHealthScreen()
                 2 -> ReportScreen()
                 3 -> NotificationScreen()
-                4 -> SettingsScreen(onLogout = onLogout)
+                4 -> SettingsScreen()
             }
         }
     }
