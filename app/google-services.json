@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "968727437042",
+    "firebase_url": "https://airquality-4d1b6-default-rtdb.firebaseio.com",
     "project_id": "airquality-4d1b6",
     "storage_bucket": "airquality-4d1b6.firebasestorage.app"
   },
@@ -12,7 +13,12 @@
           "package_name": "com.example.airquality"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "968727437042-j18tsaudfn9peejhpc0h212emv3fee8p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBsAiAPuHf_ZZTiDE_-oSCl0LMAW3zCYgc"
@@ -20,7 +26,41 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "968727437042-j18tsaudfn9peejhpc0h212emv3fee8p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:968727437042:android:ce74971aaabfb02178fa6b",
+        "android_client_info": {
+          "package_name": "com.peihsuan.airquality"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "968727437042-j18tsaudfn9peejhpc0h212emv3fee8p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsAiAPuHf_ZZTiDE_-oSCl0LMAW3zCYgc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "968727437042-j18tsaudfn9peejhpc0h212emv3fee8p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
