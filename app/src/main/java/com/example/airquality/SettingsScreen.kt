@@ -3,9 +3,7 @@ package com.example.airquality
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,7 +12,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.airquality.ui.theme.*
@@ -22,18 +19,44 @@ import kotlinx.coroutines.launch
 
 private data class FavLocation(val name: String, val address: String)
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("health_profile", Context.MODE_PRIVATE) }
+    val scope = rememberCoroutineScope()
+
+    // ── 通知設定 state ────────────────────────────────────────────────────
+    val notifPrefs = remember { context.getSharedPreferences("notification_settings", Context.MODE_PRIVATE) }
+    var dailyNotificationEnabled by remember {
+        mutableStateOf(notifPrefs.getBoolean("daily_enabled", false))
+    }
+    var dailyHour   by remember { mutableIntStateOf(notifPrefs.getInt("daily_hour", 8)) }
+    var dailyMinute by remember { mutableIntStateOf(notifPrefs.getInt("daily_minute", 0)) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    fun syncDailyNotification(enabled: Boolean, hour: Int, minute: Int) {
+        val token = TokenManager.getToken(context) ?: return
+        scope.launch {
+            try {
+                RetrofitClient.apiService.setDailyNotification(
+                    DailyNotificationRequest(token = token, enabled = enabled, hour = hour, minute = minute)
+                )
+            } catch (_: Exception) {}
+        }
+    }
 
     // ── 健康檔案 state（從 SharedPreferences 載入）────────────────────────
-    val ageGroups     = listOf("18歲以下", "18-64歲", "65歲以上")
-    val conditionList = listOf("氣喘", "心血管疾病", "懷孕中", "過敏", "呼吸道疾病", "高血壓")
-
     var selectedAgeGroup  by remember { mutableStateOf(prefs.getString("health_age_group", "18-64歲") ?: "18-64歲") }
     var otherText         by remember { mutableStateOf(prefs.getString("health_other",     "") ?: "") }
+
+    val savedConditions = prefs.getString("health_conditions", "") ?: ""
+    val selectedConditions = remember {
+        mutableStateListOf<String>().also { list ->
+            if (savedConditions.isNotEmpty()) list.addAll(savedConditions.split(","))
+        }
+    }
+    var showHealthDialog by remember { mutableStateOf(false) }
 
     // ── 常用地點 state ────────────────────────────────────────────────────────
     val favLocations = remember {
@@ -47,20 +70,13 @@ fun SettingsScreen() {
             }
         }
     }
+    var showLocationsDialog by remember { mutableStateOf(false) }
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     var editName     by remember { mutableStateOf("") }
     var editAddress  by remember { mutableStateOf("") }
 
-    val savedConditions = prefs.getString("health_conditions", "") ?: ""
-    val selectedConditions = remember {
-        mutableStateListOf<String>().also { list ->
-            if (savedConditions.isNotEmpty()) list.addAll(savedConditions.split(","))
-        }
-    }
-
     // ── Snackbar ──────────────────────────────────────────────────────────
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -75,230 +91,357 @@ fun SettingsScreen() {
             // ── Header ────────────────────────────────────────────────────
             AppHeader(title = "設定")
 
-            // ── 主內容 (scrollable) ───────────────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
-            ) {
+            // ── 主內容（不捲動，僅精簡列表 + 彈跳視窗）───────────────────
+            Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
                 Spacer(Modifier.height(24.dp))
 
-                // ── 個人健康檔案 ───────────────────────────────────────────
-                SettingSection("個人健康檔案") {
+                // ── 通知設定（常用，直接顯示）───────────────────────────
+                SettingSection("通知設定") {
                     Text(
-                        "此資料將用於 AI (RAG) 分析，提供個人化健康建議",
+                        "開啟後，每天會在你指定的時間收到一次所在地區的空氣品質摘要通知",
                         color = TextGray, fontSize = 13.sp,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
-
-                    // 1. 年齡層
-                    HealthFieldLabel("年齡層")
-                    SingleSelectChipRow(ageGroups, selectedAgeGroup) { selectedAgeGroup = it }
-
-                    Spacer(Modifier.height(16.dp))
-
-                    // 2. 生理狀態與病史（多選）
-                    HealthFieldLabel("生理狀態與病史")
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        conditionList.forEach { condition ->
-                            FilterChip(
-                                selected = selectedConditions.contains(condition),
-                                onClick = {
-                                    if (selectedConditions.contains(condition))
-                                        selectedConditions.remove(condition)
-                                    else
-                                        selectedConditions.add(condition)
-                                },
-                                label = { Text(condition, fontSize = 13.sp) },
-                                colors = healthChipColors()
+                    SettingSwitchRow(
+                        label = "每日空氣品質通知",
+                        checked = dailyNotificationEnabled,
+                        onCheckedChange = { checked ->
+                            dailyNotificationEnabled = checked
+                            notifPrefs.edit().putBoolean("daily_enabled", checked).apply()
+                            syncDailyNotification(checked, dailyHour, dailyMinute)
+                        }
+                    )
+                    if (dailyNotificationEnabled) {
+                        HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { showTimePicker = true }
+                                .padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("通知時間", color = TextDark, fontSize = 16.sp)
+                            Text(
+                                "%02d:%02d".format(dailyHour, dailyMinute),
+                                color = OrangeMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
+                }
 
-                    Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
 
-                    // 3. 其他說明
-                    HealthFieldLabel("其他說明")
-                    OutlinedTextField(
-                        value = otherText,
-                        onValueChange = { otherText = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        placeholder = { Text("如長期服用藥物、特殊病史等", color = TextGray, fontSize = 14.sp) },
-                        colors = healthTextFieldColors(),
-                        minLines = 2,
-                        maxLines = 4
-                    )
-
-                    Spacer(Modifier.height(20.dp))
-
-                    // 8. 儲存按鈕
-                    Button(
-                        onClick = {
-                            prefs.edit()
-                                .putString("health_age_group",  selectedAgeGroup)
-                                .putString("health_conditions", selectedConditions.joinToString(","))
-                                .putString("health_other",      otherText)
-                                .apply()
+                OutlinedButton(
+                    onClick = {
+                        val token = TokenManager.getToken(context)
+                        if (token == null) {
+                            scope.launch { snackbarHostState.showSnackbar("尚未取得裝置 Token，請稍後再試") }
+                        } else {
                             scope.launch {
-                                snackbarHostState.showSnackbar("✅ 健康檔案已儲存於本機")
+                                val message = try {
+                                    val resp = RetrofitClient.apiService.testDailyNotification(
+                                        DailyNotificationTestRequest(token = token)
+                                    )
+                                    if (resp.status == "success")
+                                        "✅ 測試通知已發送（${resp.county} AQI ${resp.aqi}）"
+                                    else
+                                        "⚠️ ${resp.message ?: "發送失敗"}"
+                                } catch (e: Exception) {
+                                    "⚠️ 發送失敗：${e.message}"
+                                }
+                                snackbarHostState.showSnackbar(message)
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeMain)
-                    ) {
-                        Text("儲存健康檔案", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                // ── 常用地點 ───────────────────────────────────────────────
-                Row(
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeMain)
                 ) {
-                    Text("常用地點", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextMid)
-                    TextButton(onClick = {
-                        editingIndex = favLocations.size  // 新增模式：index = 當前長度
-                        editName    = ""
-                        editAddress = ""
-                    }) {
-                        Text("＋ 新增", color = OrangeMain, fontSize = 14.sp)
-                    }
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(CardWhite)
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                ) {
-                    val filled = favLocations.filter { it.name.isNotEmpty() && it.address.isNotEmpty() }
-                    if (filled.isEmpty()) {
-                        Text(
-                            "尚未新增常用地點",
-                            color = TextGray, fontSize = 14.sp,
-                            modifier = Modifier.padding(vertical = 14.dp)
-                        )
-                    } else {
-                        filled.forEachIndexed { idx, fav ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        editingIndex = favLocations.indexOf(fav)
-                                        editName    = fav.name
-                                        editAddress = fav.address
-                                    }
-                                    .padding(vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(fav.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextDark)
-                                    Text(fav.address, fontSize = 12.sp, color = TextGray)
-                                }
-                                Text("›", fontSize = 18.sp, color = TextGray)
-                            }
-                            if (idx < filled.size - 1) HorizontalDivider(color = DividerColor)
-                        }
-                    }
-                }
-
-                // ── 常用地點新增／編輯 Dialog ──────────────────────────────
-                if (editingIndex != null) {
-                    val isNew = editingIndex == favLocations.size
-                    AlertDialog(
-                        onDismissRequest = { editingIndex = null },
-                        containerColor = BgMain,
-                        title = {
-                            Text(if (isNew) "新增常用地點" else "編輯地點",
-                                fontWeight = FontWeight.Bold, color = TextDark)
-                        },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = editName,
-                                    onValueChange = { editName = it },
-                                    label = { Text("名稱") },
-                                    placeholder = { Text("例如：家、公司、健身房", color = TextGray, fontSize = 13.sp) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = healthTextFieldColors(),
-                                    singleLine = true
-                                )
-                                OutlinedTextField(
-                                    value = editAddress,
-                                    onValueChange = { editAddress = it },
-                                    label = { Text("地址") },
-                                    placeholder = { Text("例如：台北市中正區重慶南路", color = TextGray, fontSize = 13.sp) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = healthTextFieldColors(),
-                                    singleLine = true
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                val i = editingIndex ?: return@TextButton
-                                val newFav = FavLocation(editName.trim(), editAddress.trim())
-                                if (isNew) favLocations.add(newFav)
-                                else favLocations[i] = newFav
-                                // 重寫所有地點到 prefs
-                                val editor = prefs.edit()
-                                favLocations.forEachIndexed { idx, f ->
-                                    editor.putString("fav_${idx + 1}_name",    f.name)
-                                    editor.putString("fav_${idx + 1}_address", f.address)
-                                }
-                                editor.putInt("fav_count", favLocations.size).apply()
-                                editingIndex = null
-                            }) { Text("儲存", color = OrangeMain) }
-                        },
-                        dismissButton = {
-                            Row {
-                                if (!isNew) {
-                                    TextButton(onClick = {
-                                        val i = editingIndex ?: return@TextButton
-                                        favLocations.removeAt(i)
-                                        val editor = prefs.edit()
-                                        favLocations.forEachIndexed { idx, f ->
-                                            editor.putString("fav_${idx + 1}_name",    f.name)
-                                            editor.putString("fav_${idx + 1}_address", f.address)
-                                        }
-                                        editor.putInt("fav_count", favLocations.size).apply()
-                                        editingIndex = null
-                                    }) { Text("刪除", color = RedText) }
-                                }
-                                TextButton(onClick = { editingIndex = null }) {
-                                    Text("取消", color = TextGray)
-                                }
-                            }
-                        }
-                    )
+                    Text("🔔 發送測試通知", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── 連結列 ────────────────────────────────────────────────
+                // ── 其他設定：點開才顯示詳細內容 ─────────────────────────
                 SettingSection(title = null) {
-                    SettingLinkRow("我的通報配置")
+                    SettingLinkRow("個人健康檔案") { showHealthDialog = true }
                     HorizontalDivider(color = DividerColor)
-                    SettingLinkRow("通知設定")
+                    SettingLinkRow("常用地點") { showLocationsDialog = true }
                 }
 
                 Spacer(Modifier.height(32.dp))
             }
         }
     }
+
+    // ── 個人健康檔案 彈跳視窗 ───────────────────────────────────────────────
+    if (showHealthDialog) {
+        HealthProfileDialog(
+            selectedAgeGroup   = selectedAgeGroup,
+            onAgeGroupChange   = { selectedAgeGroup = it },
+            selectedConditions = selectedConditions,
+            otherText          = otherText,
+            onOtherTextChange  = { otherText = it },
+            onDismiss          = { showHealthDialog = false },
+            onSave = {
+                prefs.edit()
+                    .putString("health_age_group",  selectedAgeGroup)
+                    .putString("health_conditions", selectedConditions.joinToString(","))
+                    .putString("health_other",      otherText)
+                    .apply()
+                showHealthDialog = false
+                scope.launch { snackbarHostState.showSnackbar("✅ 健康檔案已儲存於本機") }
+            }
+        )
+    }
+
+    // ── 常用地點 彈跳視窗 ─────────────────────────────────────────────────
+    if (showLocationsDialog) {
+        LocationsDialog(
+            favLocations = favLocations,
+            onDismiss = { showLocationsDialog = false },
+            onAddClick = {
+                editingIndex = favLocations.size
+                editName    = ""
+                editAddress = ""
+            },
+            onItemClick = { idx ->
+                editingIndex = idx
+                editName    = favLocations[idx].name
+                editAddress = favLocations[idx].address
+            }
+        )
+    }
+
+    // ── 常用地點新增／編輯 彈跳視窗 ──────────────────────────────────────
+    if (editingIndex != null) {
+        val isNew = editingIndex == favLocations.size
+        AlertDialog(
+            onDismissRequest = { editingIndex = null },
+            containerColor = BgMain,
+            title = {
+                Text(if (isNew) "新增常用地點" else "編輯地點",
+                    fontWeight = FontWeight.Bold, color = TextDark)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("名稱") },
+                        placeholder = { Text("例如：家、公司、健身房", color = TextGray, fontSize = 13.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = healthTextFieldColors(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = editAddress,
+                        onValueChange = { editAddress = it },
+                        label = { Text("地址") },
+                        placeholder = { Text("例如：台北市中正區重慶南路", color = TextGray, fontSize = 13.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = healthTextFieldColors(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val i = editingIndex ?: return@TextButton
+                    val newFav = FavLocation(editName.trim(), editAddress.trim())
+                    if (isNew) favLocations.add(newFav)
+                    else favLocations[i] = newFav
+                    // 重寫所有地點到 prefs
+                    val editor = prefs.edit()
+                    favLocations.forEachIndexed { idx, f ->
+                        editor.putString("fav_${idx + 1}_name",    f.name)
+                        editor.putString("fav_${idx + 1}_address", f.address)
+                    }
+                    editor.putInt("fav_count", favLocations.size).apply()
+                    editingIndex = null
+                }) { Text("儲存", color = OrangeMain) }
+            },
+            dismissButton = {
+                Row {
+                    if (!isNew) {
+                        TextButton(onClick = {
+                            val i = editingIndex ?: return@TextButton
+                            favLocations.removeAt(i)
+                            val editor = prefs.edit()
+                            favLocations.forEachIndexed { idx, f ->
+                                editor.putString("fav_${idx + 1}_name",    f.name)
+                                editor.putString("fav_${idx + 1}_address", f.address)
+                            }
+                            editor.putInt("fav_count", favLocations.size).apply()
+                            editingIndex = null
+                        }) { Text("刪除", color = RedText) }
+                    }
+                    TextButton(onClick = { editingIndex = null }) {
+                        Text("取消", color = TextGray)
+                    }
+                }
+            }
+        )
+    }
+
+    if (showTimePicker) {
+        DailyNotificationTimePickerDialog(
+            initialHour = dailyHour,
+            initialMinute = dailyMinute,
+            onDismiss = { showTimePicker = false },
+            onConfirm = { hour, minute ->
+                dailyHour = hour
+                dailyMinute = minute
+                notifPrefs.edit()
+                    .putInt("daily_hour", hour)
+                    .putInt("daily_minute", minute)
+                    .apply()
+                syncDailyNotification(true, hour, minute)
+                showTimePicker = false
+            }
+        )
+    }
+}
+
+// ── 個人健康檔案 Dialog ──────────────────────────────────────────────────────
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun HealthProfileDialog(
+    selectedAgeGroup: String,
+    onAgeGroupChange: (String) -> Unit,
+    selectedConditions: MutableList<String>,
+    otherText: String,
+    onOtherTextChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit
+) {
+    val ageGroups     = listOf("18歲以下", "18-64歲", "65歲以上")
+    val conditionList = listOf("氣喘", "心血管疾病", "懷孕中", "過敏", "呼吸道疾病", "高血壓")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BgMain,
+        title = { Text("個人健康檔案", fontWeight = FontWeight.Bold, color = TextDark) },
+        text = {
+            Column {
+                Text(
+                    "此資料將用於 AI (RAG) 分析，提供個人化健康建議",
+                    color = TextGray, fontSize = 13.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                HealthFieldLabel("年齡層")
+                SingleSelectChipRow(ageGroups, selectedAgeGroup, onAgeGroupChange)
+
+                Spacer(Modifier.height(16.dp))
+
+                HealthFieldLabel("生理狀態與病史")
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    conditionList.forEach { condition ->
+                        FilterChip(
+                            selected = selectedConditions.contains(condition),
+                            onClick = {
+                                if (selectedConditions.contains(condition))
+                                    selectedConditions.remove(condition)
+                                else
+                                    selectedConditions.add(condition)
+                            },
+                            label = { Text(condition, fontSize = 13.sp) },
+                            colors = healthChipColors()
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                HealthFieldLabel("其他說明")
+                OutlinedTextField(
+                    value = otherText,
+                    onValueChange = onOtherTextChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    placeholder = { Text("如長期服用藥物、特殊病史等", color = TextGray, fontSize = 14.sp) },
+                    colors = healthTextFieldColors(),
+                    minLines = 2,
+                    maxLines = 4
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSave) { Text("儲存", color = OrangeMain) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消", color = TextGray) }
+        }
+    )
+}
+
+// ── 常用地點 Dialog ──────────────────────────────────────────────────────────
+
+@Composable
+private fun LocationsDialog(
+    favLocations: List<FavLocation>,
+    onDismiss: () -> Unit,
+    onAddClick: () -> Unit,
+    onItemClick: (Int) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BgMain,
+        title = {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("常用地點", fontWeight = FontWeight.Bold, color = TextDark)
+                TextButton(onClick = onAddClick) {
+                    Text("＋ 新增", color = OrangeMain, fontSize = 14.sp)
+                }
+            }
+        },
+        text = {
+            val filled = favLocations.filter { it.name.isNotEmpty() && it.address.isNotEmpty() }
+            if (filled.isEmpty()) {
+                Text(
+                    "尚未新增常用地點",
+                    color = TextGray, fontSize = 14.sp,
+                    modifier = Modifier.padding(vertical = 14.dp)
+                )
+            } else {
+                Column {
+                    filled.forEachIndexed { idx, fav ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onItemClick(favLocations.indexOf(fav)) }
+                                .padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(fav.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextDark)
+                                Text(fav.address, fontSize = 12.sp, color = TextGray)
+                            }
+                            Text("›", fontSize = 18.sp, color = TextGray)
+                        }
+                        if (idx < filled.size - 1) HorizontalDivider(color = DividerColor)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("關閉", color = OrangeMain) }
+        }
+    )
 }
 
 // ── 輔助 Composable ────────────────────────────────────────────────────────
@@ -342,6 +485,35 @@ private fun healthChipColors() = FilterChipDefaults.filterChipColors(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun DailyNotificationTimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (hour: Int, minute: Int) -> Unit
+) {
+    val state = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = true
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BgMain,
+        title = { Text("選擇通知時間", fontWeight = FontWeight.Bold, color = TextDark) },
+        text = { TimePicker(state = state) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) {
+                Text("確定", color = OrangeMain)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消", color = TextGray) }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun healthTextFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedContainerColor = BgMain,
     focusedContainerColor   = BgMain,
@@ -368,15 +540,38 @@ fun SettingSection(title: String?, content: @Composable ColumnScope.() -> Unit) 
 }
 
 @Composable
-fun SettingLinkRow(label: String) {
+fun SettingLinkRow(label: String, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, color = TextDark, fontSize = 17.sp)
         Text("›", color = TextGray, fontSize = 23.sp, fontWeight = FontWeight.Light)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingSwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = TextDark, fontSize = 16.sp)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = White,
+                checkedTrackColor = OrangeMain,
+            )
+        )
     }
 }
