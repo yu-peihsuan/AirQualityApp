@@ -245,8 +245,8 @@ interface AirQualityApiService {
 // ── Retrofit 連線實體 ─────────────────────────────────────────────────────────
 
 object RetrofitClient {
-    // 10.0.2.2 是 Android 模擬器連向本機電腦 (localhost) 的專用 IP
-    private const val BASE_URL = "http://10.0.2.2:8000/"
+    // 正式後端（Cloud Run，台灣機房）；本機開發時可暫時改回 http://10.0.2.2:8000/
+    private const val BASE_URL = "https://airquality-api-968727437042.asia-east1.run.app/"
 
     val apiService: AirQualityApiService by lazy {
         Retrofit.Builder()
