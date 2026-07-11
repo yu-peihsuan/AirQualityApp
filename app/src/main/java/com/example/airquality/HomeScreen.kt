@@ -221,6 +221,11 @@ fun HomeScreen(
                     val successState = uiState as AqiUiState.Success
                     val nearestRecord = successState.nearestRecord
 
+                    // AQI 等級變化時同步更新桌面圖示（雲寶變臉）
+                    LaunchedEffect(nearestRecord.aqi) {
+                        AppIconManager.update(context, nearestRecord.aqi.toIntOrNull())
+                    }
+
                     if (successState.isFromCache) {
                         Box(
                             Modifier
