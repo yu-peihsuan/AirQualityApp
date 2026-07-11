@@ -87,7 +87,13 @@ private fun cardContent(item: NewsRecord, group: NotifGroup): Pair<String, Strin
         val label  = eventLabel(item.structuredEvent?.eventType ?: item.category)
         val region = item.region
         val title  = if (region.isNotBlank()) "$label・$region" else label
-        Pair(title, item.summary.take(40))
+        // 資料可信度標示：已證實（多源佐證）/ 未證實（僅單一回報）
+        val verifyTag = when (item.isConfirmed) {
+            true  -> "【已證實】"
+            false -> "【未證實】"
+            else  -> ""
+        }
+        Pair(title, verifyTag + item.summary.take(40))
     }
     NotifGroup.AQI      -> Pair(
         item.title,
@@ -174,6 +180,16 @@ fun NotificationScreen(
                         sections.forEach { section ->
                             SectionBlock(section = section)
                             Spacer(Modifier.height(20.dp))
+                        }
+                        // 民眾回報免責聲明（僅在列表含回報時顯示）
+                        if (sections.any { it.group == NotifGroup.REPORT }) {
+                            Text(
+                                "民眾回報為使用者提供之資訊，未經證實前僅供參考。",
+                                fontSize = 11.sp,
+                                color = TextGray,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
                         }
                         Spacer(Modifier.height(16.dp))
                     }

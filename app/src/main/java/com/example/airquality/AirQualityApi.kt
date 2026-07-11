@@ -49,7 +49,8 @@ data class NewsRecord(
     val category: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
-    @SerializedName("structured_event") val structuredEvent: StructuredEvent? = null
+    @SerializedName("structured_event") val structuredEvent: StructuredEvent? = null,
+    @SerializedName("is_confirmed") val isConfirmed: Boolean? = null
 )
 
 data class NewsResponse(

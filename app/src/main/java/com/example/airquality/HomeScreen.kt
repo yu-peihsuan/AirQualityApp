@@ -73,7 +73,6 @@ fun HomeScreen(
     val uiState             by viewModel.uiState.collectAsState()
     val isRaining           by viewModel.isRaining.collectAsState()
     val currentLocationName by viewModel.currentLocationName.collectAsState()
-    val estimateInfo        by viewModel.estimateInfo.collectAsState()
     var showLocationDialog  by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -301,28 +300,6 @@ fun HomeScreen(
                                 .padding(horizontal = 30.dp, vertical = 14.dp) // AQI標籤加大
                         ) {
                             Text("AQI $aqiValue $displayStatus", color = aqiColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) // 文字再加大
-                        }
-
-                        // ── IDW 空間插值：所在位置估計值 ──────────────
-                        estimateInfo?.estimate?.aqi?.let { estAqi ->
-                            val stationNames = estimateInfo?.stations
-                                ?.joinToString("、") { it.sitename } ?: ""
-                            Spacer(Modifier.height(14.dp))
-                            Text(
-                                "📍 你的位置估計 AQI ${"%.1f".format(estAqi)}",
-                                color = TextDark,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            if (stationNames.isNotEmpty()) {
-                                Text(
-                                    "IDW 空間插值・參考測站：$stationNames",
-                                    color = TextGray,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
                         }
                     }
 

@@ -62,10 +62,13 @@ class HomeViewModel : ViewModel() {
     private val _userMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val userMessage: SharedFlow<String> = _userMessage.asSharedFlow()
 
-    // IDW 空間插值：使用者定位點的空品估計（含參與測站）
+    // IDW 空間插值：使用者定位點的空品估計（含參與測站）。
+    // 目前不在 UI 顯示（後端 /api/air_quality/estimate 為研究驗證用），
+    // 若未來要顯示，於各定位成功處呼叫 refreshEstimate() 即可。
     private val _estimateInfo = MutableStateFlow<EstimateResponse?>(null)
     val estimateInfo: StateFlow<EstimateResponse?> = _estimateInfo.asStateFlow()
 
+    @Suppress("unused")
     private fun refreshEstimate(lat: Double, lng: Double) {
         viewModelScope.launch {
             _estimateInfo.value = try {
@@ -117,7 +120,6 @@ class HomeViewModel : ViewModel() {
                 _userLat = lat
                 _userLng = lng
                 AppLocationState.update(lat, lng)
-                refreshEstimate(lat, lng)
                 try {
                     val weather = RetrofitClient.apiService.getWeather(
                         county = nearestAqi.county,
@@ -162,7 +164,6 @@ class HomeViewModel : ViewModel() {
                 val successState = AqiUiState.Success(aqiResponse, nearestAqi, displayRegion, isCache)
                 _lastSuccessState = successState
                 _uiState.value = successState
-                refreshEstimate(lat, lng)
 
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "fetchAirQuality failed", e)
@@ -196,7 +197,6 @@ class HomeViewModel : ViewModel() {
                 _uiState.value = successState
                 _userLat = location.latitude
                 _userLng = location.longitude
-                refreshEstimate(location.latitude, location.longitude)
                 // GPS 縣市確認後，上傳 FCM Token（含座標與健康狀況）給後端
                 TokenManager.uploadTokenWithCounty(context, nearestAqi.county, location.latitude, location.longitude)
                 // 抓即時天氣（判斷是否下雨，供首頁圖示使用）
