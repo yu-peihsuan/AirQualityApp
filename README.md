@@ -2,6 +2,10 @@
 
 台灣空氣品質即時監測 App 的 Android 前端，使用 **Kotlin + Jetpack Compose** 開發。
 
+- 套件名稱（applicationId）：`com.peihsuan.airquality`（程式碼 namespace 為 `com.example.airquality`，兩者不同屬正常設定）
+- 後端：已部署於 Google Cloud Run（Firebase 專案 `airquality-4d1b6`），App 開箱即用，無需本機伺服器
+- 特色功能：**動態桌面圖示** — 雲寶吉祥物依即時 AQI 等級自動變臉（六種表情）
+
 ---
 
 ## 系統需求
@@ -32,13 +36,18 @@ MAPS_API_KEY=你的_Google_Maps_API_Key
 
 ### 3. 後端連線設定
 
-後端 API 位址在 [AirQualityApi.kt](app/src/main/java/com/example/airquality/AirQualityApi.kt)：
+後端 API 位址在 [AirQualityApi.kt](app/src/main/java/com/example/airquality/AirQualityApi.kt)，**預設連向雲端正式後端**：
 
 ```kotlin
-private const val BASE_URL = "http://10.0.2.2:8000/"
+private const val BASE_URL = "https://airquality-api-968727437042.asia-east1.run.app/"
 ```
 
-> `10.0.2.2` 是 Android 模擬器連到本機 `localhost` 的固定 IP。實體裝置需改為電腦的區域網路 IP。
+> 需要連本機後端開發測試時，暫時改回 `http://10.0.2.2:8000/`（模擬器連本機的固定 IP），並在 `AndroidManifest.xml` 的 `<application>` 暫時加回 `android:usesCleartextTraffic="true"`。**測完記得改回來，不要 commit。**
+
+### 4. Android Studio Run 設定（重要）
+
+本 App 使用 activity-alias 實作動態圖示，Run 按鈕需指定啟動 Activity 才不會報錯：
+**Run → Edit Configurations → app → Launch Options → Launch = Specified Activity → `com.example.airquality.MainActivity`**
 
 ---
 
@@ -68,7 +77,20 @@ MVVM 架構
 
 推播
 └── Firebase Cloud Messaging（MyFirebaseMessagingService.kt）
+
+動態桌面圖示
+├── AppIconManager.kt          → AQI 等級 → activity-alias 切換邏輯
+├── AndroidManifest.xml        → 7 個 activity-alias（預設 + 六等級表情）
+└── design/icons/              → 雲寶圖示母檔與產生腳本（見該目錄 README）
 ```
+
+---
+
+## 動態桌面圖示（雲寶變臉）
+
+首頁取得 AQI 後，`AppIconManager` 依環境部六級指標啟用對應的 activity-alias，
+桌面圖示自動切換為對應表情（良好=笑臉、不健康=戴口罩、危害=昏倒…）。
+僅於「等級改變」時切換，避免圖示頻繁閃動。改圖示設計請見 `design/icons/README.md`。
 
 ---
 
@@ -101,15 +123,20 @@ MVVM 架構
 
 1. 用 Android Studio 開啟 `AirQualityApp/` 資料夾
 2. 確認 `local.properties` 已設定 `MAPS_API_KEY`
-3. 確認後端已啟動（`http://localhost:8000`）
-4. 選擇模擬器（需含 **Google Play**）或實體裝置
-5. 點擊 Run ▶
+3. 選擇模擬器（需含 **Google Play**）或實體裝置
+4. 點擊 Run ▶（後端在雲端 24 小時運行，不需啟動任何本機服務）
 
 ---
 
 ## 推播測試
 
-1. 在模擬器上啟動 App（自動上傳 FCM Token 給後端）
-2. 後端 terminal 確認印出 `✅ FCM Token 已註冊`
-3. 開啟瀏覽器打 `http://localhost:8000/docs`
-4. 找 `POST /api/fcm/push`，填入縣市與訊息測試推播
+1. 啟動 App（自動上傳 FCM Token 給雲端後端）
+2. 開啟瀏覽器打 **https://airquality-api-968727437042.asia-east1.run.app/docs**
+3. 找 `POST /api/fcm/push`，填入縣市與訊息測試推播
+
+---
+
+## 資料與隱私
+
+- 健康檔案（年齡層、氣喘、心血管等）**僅儲存於裝置本機**（SharedPreferences），不上傳伺服器
+- 民眾回報在通知中心顯示【已證實】/【未證實】標籤（後端 LLM 審核 + 多源佐證），並附免責聲明
