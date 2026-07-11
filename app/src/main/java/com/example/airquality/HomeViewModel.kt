@@ -6,8 +6,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -55,6 +58,10 @@ class HomeViewModel : ViewModel() {
     private val _currentLocationName = MutableStateFlow("GPS 定位")
     val currentLocationName: StateFlow<String> = _currentLocationName.asStateFlow()
 
+    // 一次性使用者提示（如地址搜尋失敗），由 HomeScreen 收集後以 Toast 顯示
+    private val _userMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val userMessage: SharedFlow<String> = _userMessage.asSharedFlow()
+
     // 記憶體快取：最後一次成功的 AQI 狀態，供 API 失敗時備援
     private var _lastSuccessState: AqiUiState.Success? = null
 
@@ -79,6 +86,9 @@ class HomeViewModel : ViewModel() {
             _currentLocationName.value = name
             try {
                 val coords = googleForwardGeocode(address)
+                if (coords == null) {
+                    _userMessage.tryEmit("找不到「$name」的位置（地址搜尋暫時無法使用），暫以台北市資料顯示")
+                }
                 val lat = coords?.first ?: 25.032969
                 val lng = coords?.second ?: 121.516039
                 val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
@@ -307,6 +317,9 @@ class HomeViewModel : ViewModel() {
                 lat = result.first
                 lng = result.second
                 region = address.take(6)
+            } else if (address != "台北市") {
+                // 預設 fallback 地址本來就是台北市，查不到才需要提示使用者
+                _userMessage.tryEmit("找不到「$address」的位置（地址搜尋暫時無法使用），暫以台北市資料顯示")
             }
         }
         return Triple(lat, lng, region)
