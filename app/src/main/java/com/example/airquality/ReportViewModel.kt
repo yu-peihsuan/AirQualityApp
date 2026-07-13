@@ -144,7 +144,7 @@ class ReportViewModel : ViewModel() {
         withContext(Dispatchers.IO) {
             try {
                 val encoded = java.net.URLEncoder.encode(address, "UTF-8")
-                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=${BuildConfig.MAPS_API_KEY}&language=zh-TW")
+                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=${BuildConfig.GEOCODING_API_KEY}&language=zh-TW")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
                 if (conn.responseCode == 200) {
@@ -165,7 +165,7 @@ class ReportViewModel : ViewModel() {
     private suspend fun reverseGeocode(lat: Double, lng: Double): String? =
         withContext(Dispatchers.IO) {
             try {
-                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=${BuildConfig.MAPS_API_KEY}&language=zh-TW")
+                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=${BuildConfig.GEOCODING_API_KEY}&language=zh-TW")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
                 if (conn.responseCode == 200) {

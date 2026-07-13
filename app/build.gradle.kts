@@ -24,13 +24,30 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // 地圖顯示（Maps SDK）：Android 應用程式限制的金鑰，只進 Manifest
         manifestPlaceholders["MAPS_API_KEY"] = localProps.getProperty("MAPS_API_KEY", "")
         buildConfigField("String", "MAPS_API_KEY", "\"${localProps.getProperty("MAPS_API_KEY", "")}\"")
+        // 地址搜尋（Geocoding HTTP 呼叫）：僅限 Geocoding API 的伺服器金鑰
+        buildConfigField("String", "GEOCODING_API_KEY", "\"${localProps.getProperty("GEOCODING_API_KEY", "")}\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            // 金鑰資訊存於 local.properties（不進 git）；keystore 檔在專案外層 keystore/ 目錄
+            val ksFile = localProps.getProperty("KEYSTORE_FILE", "")
+            if (ksFile.isNotEmpty()) {
+                storeFile = file(ksFile)
+                storePassword = localProps.getProperty("KEYSTORE_PASSWORD", "")
+                keyAlias = localProps.getProperty("KEY_ALIAS", "")
+                keyPassword = localProps.getProperty("KEY_PASSWORD", "")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
