@@ -67,7 +67,8 @@ data class ReportRequest(
     val category: String,
     val description: String,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    @SerializedName("device_id") val deviceId: String? = null
 )
 
 data class ReportResponse(

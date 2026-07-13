@@ -97,15 +97,24 @@ class ReportViewModel : ViewModel() {
                 } else {
                     forwardGeocode(location)
                 }
+                val deviceId = android.provider.Settings.Secure.getString(
+                    context.contentResolver, android.provider.Settings.Secure.ANDROID_ID
+                )
                 val response = RetrofitClient.apiService.submitReport(
                     ReportRequest(
                         location = location,
                         category = category,
                         description = description,
                         latitude = coords?.first,
-                        longitude = coords?.second
+                        longitude = coords?.second,
+                        deviceId = deviceId
                     )
                 )
+                if (response.status != "success") {
+                    // 頻率限制或重複回報：顯示後端回傳的原因
+                    _uiState.value = ReportUiState.Error(response.message)
+                    return@launch
+                }
                 val msg = if (response.isConfirmed) "已確認為污染事件，感謝您的通報！" else "回報已送出，感謝您的通報。"
                 _uiState.value = ReportUiState.Success(msg, response.isConfirmed)
             } catch (e: Exception) {
