@@ -7,8 +7,8 @@ const RES = path.join(__dirname, "../../app/src/main/res");
 const SRC = path.join(__dirname, "masters");
 const INK = "#2E4A5A";
 
-const CLOUD = `
-  <g fill="#FFFFFF">
+const cloud = (color) => `
+  <g fill="${color}">
     <circle cx="196" cy="286" r="82"/>
     <circle cx="298" cy="252" r="98"/>
     <circle cx="376" cy="304" r="68"/>
@@ -34,32 +34,32 @@ const happyFace = `
 
 const icons = {
   default: {
-    src: "default_icon.png", grad: ["#BCE6F2", "#82D2C0"], face: happyFace,
+    src: "default_icon.png", grad: ["#A8E0F0", "#6BCBB6"], cloud: "#FFFFFF", face: happyFace,
   },
   aqi0: {
-    src: "AQI0.png", grad: ["#B4E2B0", "#72C69C"], face: happyFace,
+    src: "AQI0.png", grad: ["#A0DCA0", "#57BA8C"], cloud: "#FFFFFF", face: happyFace,
   },
   aqi51: {
-    src: "AQI51.png", grad: ["#F8E6A4", "#ECC776"],
+    src: "AQI51.png", grad: ["#F7E18C", "#E8BA5A"], cloud: "#F0EFEB",
     face: `${eyeDots(256)}
       <path d="M280 300 h44" fill="none" stroke="${INK}" stroke-width="11" stroke-linecap="round"/>`,
   },
   aqi101: {
-    src: "AQI101.png", grad: ["#F8D2A6", "#ECAB74"],
+    src: "AQI101.png", grad: ["#F7C58C", "#E69A5A"], cloud: "#DBD8D2",
     face: `<g fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round">
         <path d="M242 232 l38 10"/><path d="M364 232 l-38 10"/></g>
       ${eyeDots(262)}
       <path d="M284 308 q19 -16 38 0" fill="none" stroke="${INK}" stroke-width="11" stroke-linecap="round"/>`,
   },
   aqi151: {
-    src: "AQI151.png", grad: ["#F5B3AA", "#E68A80"],
+    src: "AQI151.png", grad: ["#F49E93", "#E07369"], cloud: "#BFBBB4",
     face: `${MASK}
       <g fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round">
         <path d="M242 228 l38 10"/><path d="M364 228 l-38 10"/></g>
       ${eyeDots(254)}`,
   },
   aqi201: {
-    src: "AQI201.png", grad: ["#CFB4E8", "#AC8CD6"],
+    src: "AQI201.png", grad: ["#C2A0E2", "#9A72CC"], cloud: "#A19C95",
     face: `${MASK}
       <g fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round">
         <path d="M286 244 a20 20 0 1 0 -40 0 a14 14 0 1 0 28 0 a7 7 0 1 0 -14 0"/>
@@ -67,7 +67,7 @@ const icons = {
       </g>`,
   },
   aqi301: {
-    src: "AQI301.png", grad: ["#C595A0", "#9E717E"],
+    src: "AQI301.png", grad: ["#BB808C", "#8E5968"], cloud: "#696560",
     face: `${MASK}
       <g fill="none" stroke="${INK}" stroke-width="11" stroke-linecap="round">
         <path d="M250 242 l30 26 M280 242 l-30 26"/>
@@ -93,7 +93,7 @@ const LAYER  = { mdpi: 108, hdpi: 162, xhdpi: 216, xxhdpi: 324, xxxhdpi: 432 };
     // 2) 自適應前景層（透明底，雲寶置中在安全區內）
     const fgSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 432 432" width="432" height="432">
       <g transform="translate(-0.5,9.6) scale(.776)">
-        ${CLOUD}
+        ${cloud(cfg.cloud)}
         ${cfg.face}
       </g>
     </svg>`;
