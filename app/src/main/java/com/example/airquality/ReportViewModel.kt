@@ -97,15 +97,24 @@ class ReportViewModel : ViewModel() {
                 } else {
                     forwardGeocode(location)
                 }
+                val deviceId = android.provider.Settings.Secure.getString(
+                    context.contentResolver, android.provider.Settings.Secure.ANDROID_ID
+                )
                 val response = RetrofitClient.apiService.submitReport(
                     ReportRequest(
                         location = location,
                         category = category,
                         description = description,
                         latitude = coords?.first,
-                        longitude = coords?.second
+                        longitude = coords?.second,
+                        deviceId = deviceId
                     )
                 )
+                if (response.status != "success") {
+                    // 頻率限制或重複回報：顯示後端回傳的原因
+                    _uiState.value = ReportUiState.Error(response.message)
+                    return@launch
+                }
                 val msg = if (response.isConfirmed) "已確認為污染事件，感謝您的通報！" else "回報已送出，感謝您的通報。"
                 _uiState.value = ReportUiState.Success(msg, response.isConfirmed)
             } catch (e: Exception) {
@@ -135,7 +144,7 @@ class ReportViewModel : ViewModel() {
         withContext(Dispatchers.IO) {
             try {
                 val encoded = java.net.URLEncoder.encode(address, "UTF-8")
-                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=${BuildConfig.MAPS_API_KEY}&language=zh-TW")
+                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=${BuildConfig.GEOCODING_API_KEY}&language=zh-TW")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
                 if (conn.responseCode == 200) {
@@ -156,7 +165,7 @@ class ReportViewModel : ViewModel() {
     private suspend fun reverseGeocode(lat: Double, lng: Double): String? =
         withContext(Dispatchers.IO) {
             try {
-                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=${BuildConfig.MAPS_API_KEY}&language=zh-TW")
+                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=${BuildConfig.GEOCODING_API_KEY}&language=zh-TW")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
                 if (conn.responseCode == 200) {

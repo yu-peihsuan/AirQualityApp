@@ -49,7 +49,8 @@ data class NewsRecord(
     val category: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
-    @SerializedName("structured_event") val structuredEvent: StructuredEvent? = null
+    @SerializedName("structured_event") val structuredEvent: StructuredEvent? = null,
+    @SerializedName("is_confirmed") val isConfirmed: Boolean? = null
 )
 
 data class NewsResponse(
@@ -66,7 +67,8 @@ data class ReportRequest(
     val category: String,
     val description: String,
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    @SerializedName("device_id") val deviceId: String? = null
 )
 
 data class ReportResponse(
@@ -191,6 +193,29 @@ data class HotspotResponse(
     val hotspots: List<HotspotRecord> = emptyList()
 )
 
+// ── IDW 空間插值估計（個人定位點空品數值）──────────────────────────────────
+
+data class EstimateStation(
+    val sitename: String,
+    val county: String,
+    @SerializedName("distance_km") val distanceKm: Double,
+    val weight: Double,
+    val value: Double,
+)
+
+data class EstimateInfo(
+    val aqi: Double? = null,
+    val pm25: Double? = null,
+    val method: String? = null,
+    val k: Int? = null,
+)
+
+data class EstimateResponse(
+    val status: String,
+    val estimate: EstimateInfo? = null,
+    val stations: List<EstimateStation> = emptyList(),
+)
+
 // ── API 介面 ─────────────────────────────────────────────────────────────────
 
 interface AirQualityApiService {
@@ -233,6 +258,12 @@ interface AirQualityApiService {
 
     @POST("api/fcm/daily-notification/test")
     suspend fun testDailyNotification(@Body request: DailyNotificationTestRequest): DailyNotificationTestResponse
+
+    @GET("api/air_quality/estimate")
+    suspend fun getAqiEstimate(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double
+    ): EstimateResponse
 
     @GET("api/hotspots")
     suspend fun getHotspots(

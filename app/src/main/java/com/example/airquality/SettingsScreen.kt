@@ -331,6 +331,11 @@ private fun HealthProfileDialog(
                 Text(
                     "此資料將用於 AI (RAG) 分析，提供個人化健康建議",
                     color = TextGray, fontSize = 13.sp,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                Text(
+                    "🔒 健康資料僅儲存於您的裝置，不會上傳伺服器",
+                    color = TextGray, fontSize = 12.sp,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 

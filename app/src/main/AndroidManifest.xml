@@ -11,9 +11,9 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/ic_cloud_default"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/ic_cloud_default"
         android:supportsRtl="true"
         android:theme="@style/Theme.AirQuality">
 
@@ -33,13 +33,86 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.AirQuality">
+            android:theme="@style/Theme.AirQuality" />
+
+        <!-- 動態圖示：依 AQI 等級啟用對應的 alias（同一時間只有一個啟用） -->
+        <activity-alias
+            android:name="com.example.airquality.IconDefault"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_cloud_default"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+        <activity-alias
+            android:name="com.example.airquality.IconAqi0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_cloud_aqi0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.example.airquality.IconAqi51"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_cloud_aqi51"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.example.airquality.IconAqi101"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_cloud_aqi101"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.example.airquality.IconAqi151"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_cloud_aqi151"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.example.airquality.IconAqi201"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_cloud_aqi201"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.example.airquality.IconAqi301"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_cloud_aqi301"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
     </application>
 
 </manifest>

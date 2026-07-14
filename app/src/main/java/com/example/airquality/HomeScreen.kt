@@ -1,5 +1,6 @@
 package com.example.airquality
 
+import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -103,6 +104,13 @@ fun HomeScreen(
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
+        }
+    }
+
+    // 收集 ViewModel 的一次性提示（如地址搜尋失敗），以 Toast 顯示
+    LaunchedEffect(Unit) {
+        viewModel.userMessage.collect { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -220,6 +228,11 @@ fun HomeScreen(
                 is AqiUiState.Success -> {
                     val successState = uiState as AqiUiState.Success
                     val nearestRecord = successState.nearestRecord
+
+                    // AQI 等級變化時同步更新桌面圖示（雲寶變臉）
+                    LaunchedEffect(nearestRecord.aqi) {
+                        AppIconManager.update(context, nearestRecord.aqi.toIntOrNull())
+                    }
 
                     if (successState.isFromCache) {
                         Box(
