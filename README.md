@@ -4,7 +4,7 @@
 
 - 套件名稱（applicationId）：`com.peihsuan.airquality`（程式碼 namespace 為 `com.example.airquality`，兩者不同屬正常設定）
 - 後端：已部署於 Google Cloud Run（Firebase 專案 `airquality-4d1b6`），App 開箱即用，無需本機伺服器
-- 特色功能：**動態桌面圖示** — 雲寶吉祥物依即時 AQI 等級自動變臉（六種表情）
+- 特色功能：**動態桌面圖示** — 圖示依即時 AQI 等級自動變臉（六種表情）、更換顏色
 
 ---
 
@@ -81,15 +81,15 @@ MVVM 架構
 動態桌面圖示
 ├── AppIconManager.kt          → AQI 等級 → activity-alias 切換邏輯
 ├── AndroidManifest.xml        → 7 個 activity-alias（預設 + 六等級表情）
-└── design/icons/              → 雲寶圖示母檔與產生腳本（見該目錄 README）
+└── design/icons/              → 桌面圖示母檔與產生腳本（見該目錄 README）
 ```
 
 ---
 
-## 動態桌面圖示（雲寶變臉）
+## 動態桌面圖示
 
 首頁取得 AQI 後，`AppIconManager` 依環境部六級指標啟用對應的 activity-alias，
-桌面圖示自動切換為對應表情（良好=笑臉、不健康=戴口罩、危害=昏倒…）。
+桌面圖示自動切換為對應表情。
 僅於「等級改變」時切換，避免圖示頻繁閃動。改圖示設計請見 `design/icons/README.md`。
 
 ---
