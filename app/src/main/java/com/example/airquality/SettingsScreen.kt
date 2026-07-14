@@ -334,7 +334,7 @@ private fun HealthProfileDialog(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 Text(
-                    "🔒 健康資料僅儲存於您的裝置，不會上傳伺服器",
+                    "🔒 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會將相關健康屬性傳送至伺服器以生成建議。",
                     color = TextGray, fontSize = 12.sp,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
