@@ -84,16 +84,11 @@ private fun cardContent(item: NewsRecord, group: NotifGroup): Pair<String, Strin
         item.summary.ifBlank { item.region }
     )
     NotifGroup.REPORT -> {
-        val label  = eventLabel(item.structuredEvent?.eventType ?: item.category)
-        val region = item.region
-        val title  = if (region.isNotBlank()) "$label・$region" else label
-        // 資料可信度標示：已證實（多源佐證）/ 未證實（僅單一回報）
-        val verifyTag = when (item.isConfirmed) {
-            true  -> "【已證實】"
-            false -> "【未證實】"
-            else  -> ""
-        }
-        Pair(title, verifyTag + item.summary.take(40))
+        val label = eventLabel(item.structuredEvent?.eventType ?: item.category)
+        // 不標示「已證實／未證實」（僅 AI 判斷、非官方核實，避免誤導）；
+        // 底部免責聲明已說明僅供參考。標題僅顯示事件類型，完整描述放內容區、
+        // 地址縮到底部小字（見 NotifItem）
+        Pair(label, item.summary)
     }
     NotifGroup.AQI      -> Pair(
         item.title,
@@ -291,7 +286,20 @@ private fun NotifItem(
                     text     = subtitle,
                     fontSize = 13.sp,
                     color    = TextMid,
-                    maxLines = 1,
+                    // 民眾回報顯示完整描述（可多行）；其他類別維持單行摘要
+                    maxLines = if (group == NotifGroup.REPORT) 10 else 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // 民眾回報：地址縮到底部小灰字，次要呈現
+            if (group == NotifGroup.REPORT && item.region.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text     = "📍 ${item.region}",
+                    fontSize = 11.sp,
+                    color    = TextGray,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
