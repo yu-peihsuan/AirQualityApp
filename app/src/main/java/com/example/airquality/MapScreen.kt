@@ -45,7 +45,6 @@ sealed class MapUiState {
     data class Success(
         val hotspots: List<HotspotRecord>,
         val reports: List<NewsRecord>,
-        val newsEvents: List<NewsRecord>,
         val fireAlerts: List<NewsRecord>,
         val userLocation: LatLng?
     ) : MapUiState()
@@ -66,7 +65,6 @@ class MapViewModel : ViewModel() {
             try {
                 val hotspotsDeferred    = async { RetrofitClient.apiService.getHotspots() }
                 val reportsDeferred     = async { RetrofitClient.apiService.getUserReports() }
-                val newsDeferred        = async { RetrofitClient.apiService.getNews() }
                 val fireAlertsDeferred  = async {
                     try { RetrofitClient.apiService.getFireAlerts() } catch (e: Exception) { null }
                 }
@@ -81,19 +79,15 @@ class MapViewModel : ViewModel() {
                 val reports      = reportsDeferred.await().records.filter {
                     it.latitude != null && it.longitude != null
                 }
-                val newsEvents   = newsDeferred.await().records.filter {
-                    it.latitude != null && it.longitude != null
-                }
                 val fireAlerts   = (fireAlertsDeferred.await()?.records ?: emptyList()).filter {
                     it.latitude != null && it.longitude != null
                 }
                 val userLocation = locationDeferred.await()
 
-                // 去重：同縣市 + 火災類型 + 時間差 ≤ 2 小時的新聞/回報，以消防署警示為準
-                val dedupedNews    = deduplicateWithFireAlerts(fireAlerts, newsEvents)
+                // 去重：同縣市 + 火災類型 + 時間差 ≤ 2 小時的回報，以消防署警示為準
                 val dedupedReports = deduplicateWithFireAlerts(fireAlerts, reports)
 
-                _uiState.value = MapUiState.Success(hotspots, dedupedReports, dedupedNews, fireAlerts, userLocation)
+                _uiState.value = MapUiState.Success(hotspots, dedupedReports, fireAlerts, userLocation)
             } catch (e: Exception) {
                 Log.e("MapViewModel", "fetchMapData failed", e)
                 _uiState.value = MapUiState.Error("地圖資料取得失敗")
@@ -297,24 +291,9 @@ fun MapScreen(
                         }
                     }
 
-                    // ── 層1：新聞確認事件 pin ─────────────────────────────────
-                    data.newsEvents.forEach { news ->
-                        val lat = news.latitude ?: return@forEach
-                        val lng = news.longitude ?: return@forEach
-                        val evType  = news.structuredEvent?.eventType
-                        val color   = reportColor(evType)
-                        val label   = eventTypeLabel(evType ?: news.category)
-                        val snippet = news.title.take(40)
-                        val alpha   = viewModel.timeAlpha(news.publishedAt)
-
-                        MarkerComposable(
-                            state   = MarkerState(position = LatLng(lat, lng)),
-                            title   = "📰 $label",
-                            snippet = snippet,
-                        ) {
-                            NewsEventPin(color = color, alpha = alpha)
-                        }
-                    }
+                    // 註：新聞事件因僅能從文字粗略定位、精度不足，不在地圖上顯示，
+                    // 改僅列於「通知中心」列表。地圖只保留有可信座標的事件
+                    // （官方火災警示、民眾 GPS 回報、回報聚合熱點）。
 
                     // ── 層2：個別回報 pin ─────────────────────────────────────
                     data.reports.forEach { report ->
@@ -399,7 +378,7 @@ fun MapScreen(
             // ── 無任何資料提示（熱點＆回報都空才顯示） ───────────────────────
             if (uiState is MapUiState.Success) {
                 val data = uiState as MapUiState.Success
-                if (data.hotspots.isEmpty() && data.reports.isEmpty() && data.newsEvents.isEmpty() && data.fireAlerts.isEmpty()) {
+                if (data.hotspots.isEmpty() && data.reports.isEmpty() && data.fireAlerts.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -416,7 +395,7 @@ fun MapScreen(
             // ── 圖例 ──────────────────────────────────────────────────────────
             if (uiState is MapUiState.Success) {
                 val data = uiState as MapUiState.Success
-                if (data.hotspots.isNotEmpty() || data.reports.isNotEmpty() || data.newsEvents.isNotEmpty() || data.fireAlerts.isNotEmpty()) {
+                if (data.hotspots.isNotEmpty() || data.reports.isNotEmpty() || data.fireAlerts.isNotEmpty()) {
                     var legendExpanded by remember { mutableStateOf(false) }
                     Column(
                         modifier = Modifier
@@ -452,12 +431,6 @@ fun MapScreen(
                                 LegendItem(Color(0xFFFF6600), "中強度 ≥ 50%", circle = true)
                                 LegendItem(Color(0xFFFFCC00), "低強度 < 50%", circle = true)
                                 LegendItem(Color(0xFF6A1B9A), "擴散條件差（無風）", circle = true)
-                            }
-                            if (data.newsEvents.isNotEmpty()) {
-                                Spacer(Modifier.height(2.dp))
-                                Text("— 新聞確認事件", fontSize = 10.sp, color = TextGray)
-                                LegendItem(Color(0xFFE53935), "火災/濃煙", circle = false, isNews = true)
-                                LegendItem(Color(0xFF8E24AA), "化學/異味", circle = false, isNews = true)
                             }
                             if (data.reports.isNotEmpty()) {
                                 Spacer(Modifier.height(2.dp))
@@ -502,29 +475,6 @@ fun FireAlertPin(alpha: Float = 1f) {
             contentAlignment = Alignment.Center
         ) {
             Text("🔥", fontSize = 14.sp)
-        }
-    }
-}
-
-// ── 新聞確認事件 Pin（菱形外框區別民眾回報）────────────────────────────────────
-
-@Composable
-fun NewsEventPin(color: Color, alpha: Float = 1f) {
-    Box(contentAlignment = Alignment.Center) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(color.copy(alpha = 0.20f * alpha))
-        )
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(color.copy(alpha = alpha)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("📰", fontSize = 10.sp)
         }
     }
 }
@@ -598,7 +548,6 @@ private fun LegendItem(
     color: Color,
     label: String,
     circle: Boolean,
-    isNews: Boolean = false,
     isFireAlert: Boolean = false
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -612,12 +561,6 @@ private fun LegendItem(
             circle -> Box(
                 modifier = Modifier.size(10.dp).clip(CircleShape).background(color)
             )
-            isNews -> Box(
-                modifier = Modifier.size(10.dp).clip(CircleShape).background(color),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("📰", fontSize = 6.sp)
-            }
             else -> Box(
                 modifier = Modifier.size(8.dp).clip(CircleShape).background(color)
             )
