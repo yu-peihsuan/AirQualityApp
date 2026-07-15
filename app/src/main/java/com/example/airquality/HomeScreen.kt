@@ -23,6 +23,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -79,31 +80,43 @@ fun HomeScreen(
     // 管理當前顯示的日期，讓它可以在回到畫面時更新
     var currentDateString by remember { mutableStateOf(getCurrentDateString()) }
 
-    // 權限請求 launcher：用戶允許後立即用 GPS 抓資料，拒絕則 fallback 地址
+    // 權限請求 launcher：依實際定位權限狀態決定初始資料來源
+    // （用實際狀態而非結果 map，因為此請求可能只含通知權限而不含定位）
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                      permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) {
+    ) { _ ->
+        val hasLocation = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        if (hasLocation) {
             loadInitialLocation(context, viewModel)
         } else {
             viewModel.fetchAirQuality(context, "台北市")
         }
     }
 
-    // 第一次進入 App 時，若尚未授權則發起權限請求
+    // 第一次進入 App 時，一次要求尚未授權的定位與通知權限
     LaunchedEffect(Unit) {
-        val hasPermission = ContextCompat.checkSelfPermission(
+        val perms = mutableListOf<String>()
+        val hasLocation = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
-        if (!hasPermission) {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
+        if (!hasLocation) {
+            perms += Manifest.permission.ACCESS_FINE_LOCATION
+            perms += Manifest.permission.ACCESS_COARSE_LOCATION
+        }
+        // Android 13（TIRAMISU）以上，通知需執行時授權，否則所有推播（含每日通知）會被系統丟棄
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED) {
+            perms += Manifest.permission.POST_NOTIFICATIONS
+        }
+        if (perms.isNotEmpty()) {
+            permissionLauncher.launch(perms.toTypedArray())
         }
     }
 
