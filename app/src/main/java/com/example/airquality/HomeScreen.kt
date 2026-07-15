@@ -86,7 +86,7 @@ fun HomeScreen(
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                       permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
-            fetchWithGps(context, viewModel)
+            loadInitialLocation(context, viewModel)
         } else {
             viewModel.fetchAirQuality(context, "台北市")
         }
@@ -114,12 +114,17 @@ fun HomeScreen(
         }
     }
 
-    // 當 lifecycle 狀態改變（回到前景 ON_RESUME）時更新日期並重新抓取空氣品質資料
+    // 當 lifecycle 狀態改變（回到前景 ON_RESUME）時更新日期並重新抓取空氣品質資料。
+    // 初次載入由下方 loadInitialLocation 依「持久化的選擇」處理；addObserver 會立即補發
+    // 一次 ON_RESUME，若不跳過會以預設 GPS 模式搶先執行、蓋掉持久化選擇，故跳過第一次。
+    var skipFirstResume by remember { mutableStateOf(true) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 currentDateString = getCurrentDateString()
-                if (viewModel.isGpsMode) {
+                if (skipFirstResume) {
+                    skipFirstResume = false
+                } else if (viewModel.isGpsMode) {
                     fetchWithGps(context, viewModel)
                 } else {
                     viewModel.refreshSavedLocation()
@@ -128,9 +133,9 @@ fun HomeScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        // 第一次進入時也主動抓取一次
+        // 第一次進入依上次持久化的選擇載入（手動地區則沿用該地區，否則 GPS 自動定位）
         currentDateString = getCurrentDateString()
-        fetchWithGps(context, viewModel)
+        loadInitialLocation(context, viewModel)
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -171,15 +176,26 @@ fun HomeScreen(
                 title = { Text("切換地點", fontWeight = FontWeight.Bold, color = TextDark) },
                 text = {
                     androidx.compose.foundation.layout.Column(
+                        modifier = Modifier
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(rememberScrollState()),
                         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
                     ) {
-                        LocationOption("📍", "GPS 定位", "自動偵測目前位置") {
+                        LocationOption(
+                            "📍", "GPS 定位", "自動偵測目前位置",
+                            selected = currentLocationName == "GPS 定位"
+                        ) {
                             showLocationDialog = false
+                            saveLocationChoice(context, "gps", "", "")
                             viewModel.switchToGps(context)
                         }
                         favLocations.forEach { (name, address) ->
-                            LocationOption("📌", name, address) {
+                            LocationOption(
+                                "📌", name, address,
+                                selected = currentLocationName == name
+                            ) {
                                 showLocationDialog = false
+                                saveLocationChoice(context, "saved", name, address)
                                 viewModel.switchToSavedLocation(name, address)
                             }
                         }
@@ -229,9 +245,10 @@ fun HomeScreen(
                     val successState = uiState as AqiUiState.Success
                     val nearestRecord = successState.nearestRecord
 
-                    // AQI 等級變化時同步更新桌面圖示（雲寶變臉）
+                    // 記錄最新 AQI 對應圖示；實際切換延到 App 退背景時（見 MainActivity.onStop），
+                    // 避免前景切換 launcher alias 把使用者踢回桌面
                     LaunchedEffect(nearestRecord.aqi) {
-                        AppIconManager.update(context, nearestRecord.aqi.toIntOrNull())
+                        AppIconManager.recordAqi(context, nearestRecord.aqi.toIntOrNull())
                     }
 
                     if (successState.isFromCache) {
@@ -518,19 +535,64 @@ fun fetchWithGps(context: Context, viewModel: HomeViewModel) {
         }
 }
 
+// ── 地點選擇持久化 ──────────────────────────────────────────────────────────────
+// 記住使用者上次的地點選擇，重開 App 時沿用；只有選「GPS 定位」才會回到自動定位。
+
+private const val LOCATION_PREF = "location_pref"
+
+private fun saveLocationChoice(context: Context, mode: String, name: String, address: String) {
+    context.getSharedPreferences(LOCATION_PREF, Context.MODE_PRIVATE).edit()
+        .putString("location_mode", mode)      // "gps" 或 "saved"
+        .putString("location_name", name)
+        .putString("location_address", address)
+        .apply()
+}
+
+/** 依上次持久化的選擇載入：手動地區則沿用該地區，否則走 GPS 自動定位。 */
+private fun loadInitialLocation(context: Context, viewModel: HomeViewModel) {
+    val lp = context.getSharedPreferences(LOCATION_PREF, Context.MODE_PRIVATE)
+    val mode = lp.getString("location_mode", "gps") ?: "gps"
+    val address = lp.getString("location_address", "") ?: ""
+    if (mode == "saved" && address.isNotBlank()) {
+        viewModel.switchToSavedLocation(lp.getString("location_name", "") ?: "", address)
+    } else {
+        fetchWithGps(context, viewModel)
+    }
+}
+
 // ── 地點選項 ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun LocationOption(emoji: String, name: String, subtitle: String, onClick: () -> Unit) {
-    Column(
-        modifier = androidx.compose.ui.Modifier
+private fun LocationOption(
+    emoji: String,
+    name: String,
+    subtitle: String,
+    selected: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) OrangeLight else Color.Transparent)
             .clickable { onClick() }
-            .padding(horizontal = 4.dp, vertical = 10.dp)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextDark)
-        Text(subtitle, fontSize = 12.sp, color = TextGray)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(name, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+                color = if (selected) OrangeMain else TextDark)
+            Text(
+                subtitle, fontSize = 12.sp, color = TextGray,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        }
+        if (selected) {
+            Spacer(Modifier.width(6.dp))
+            Text("✓ 目前", fontSize = 12.sp, color = OrangeMain,
+                fontWeight = FontWeight.Medium, maxLines = 1)
+        }
     }
 }
 

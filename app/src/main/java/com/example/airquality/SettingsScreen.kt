@@ -3,7 +3,9 @@ package com.example.airquality
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -422,7 +424,11 @@ private fun LocationsDialog(
                     modifier = Modifier.padding(vertical = 14.dp)
                 )
             } else {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     filled.forEachIndexed { idx, fav ->
                         Row(
                             modifier = Modifier
