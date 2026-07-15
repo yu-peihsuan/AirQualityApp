@@ -7,13 +7,18 @@ import android.util.Log
 
 /**
  * 動態桌面圖示管理：依 AQI 等級啟用對應的 activity-alias，讓雲寶隨空品變臉。
- * 只在「等級改變」時才切換，避免桌面圖示頻繁閃動。
+ *
+ * 重要：切換 LAUNCHER activity-alias 若在 App 前景執行，即使帶 DONT_KILL_APP，
+ * 系統仍會重載桌面、把當前 App 丟到背景（使用者被踢回桌面）。
+ * 因此採「記錄 → 套用」兩段式：前景只用 [recordAqi] 記下目標，
+ * 待 App 退到背景時（MainActivity.onStop）才由 [applyPending] 實際切換。
  */
 object AppIconManager {
 
     private const val ALIAS_PACKAGE = "com.example.airquality"
     private const val PREFS_NAME = "app_icon"
     private const val KEY_CURRENT = "current_alias"
+    private const val KEY_PENDING = "pending_alias"
     private const val DEFAULT_ALIAS = "IconDefault"
 
     private val ALL_ALIASES = listOf(
@@ -32,10 +37,16 @@ object AppIconManager {
         else         -> "IconAqi301"
     }
 
-    /** 依最新 AQI 更新桌面圖示；等級沒變則不動作。 */
-    fun update(context: Context, aqi: Int?) {
-        val target = aliasForAqi(aqi)
+    /** 前景呼叫：只記錄最新 AQI 對應的目標圖示，不切換（避免把使用者踢回桌面）。 */
+    fun recordAqi(context: Context, aqi: Int?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_PENDING, aliasForAqi(aqi)).apply()
+    }
+
+    /** App 退到背景時呼叫：把桌面圖示切換到先前記錄的目標；等級沒變則不動作。 */
+    fun applyPending(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val target = prefs.getString(KEY_PENDING, DEFAULT_ALIAS) ?: DEFAULT_ALIAS
         if (prefs.getString(KEY_CURRENT, DEFAULT_ALIAS) == target) return
 
         val pm = context.packageManager
@@ -53,7 +64,7 @@ object AppIconManager {
                 )
             }
             prefs.edit().putString(KEY_CURRENT, target).apply()
-            Log.i("AppIconManager", "桌面圖示已切換 → $target (AQI=$aqi)")
+            Log.i("AppIconManager", "桌面圖示已切換 → $target")
         } catch (e: Exception) {
             Log.e("AppIconManager", "圖示切換失敗", e)
         }

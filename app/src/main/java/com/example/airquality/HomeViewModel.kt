@@ -99,9 +99,9 @@ class HomeViewModel : ViewModel() {
     fun switchToSavedLocation(name: String, address: String) {
         _savedLocationName = name
         _savedLocationAddress = address
+        _currentLocationName.value = name   // 同步設定，讓 isGpsMode 立即反映手動選擇
         viewModelScope.launch {
             _uiState.value = AqiUiState.Loading
-            _currentLocationName.value = name
             try {
                 val coords = googleForwardGeocode(address)
                 if (coords == null) {

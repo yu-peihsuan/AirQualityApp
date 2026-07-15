@@ -3,7 +3,9 @@ package com.example.airquality
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,6 +76,9 @@ fun SettingsScreen() {
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     var editName     by remember { mutableStateOf("") }
     var editAddress  by remember { mutableStateOf("") }
+
+    // ── 使用說明 ──────────────────────────────────────────────────────────
+    var showGuideDialog by remember { mutableStateOf(false) }
 
     // ── Snackbar ──────────────────────────────────────────────────────────
     val snackbarHostState = remember { SnackbarHostState() }
@@ -168,6 +173,17 @@ fun SettingsScreen() {
                     SettingLinkRow("個人健康檔案") { showHealthDialog = true }
                     HorizontalDivider(color = DividerColor)
                     SettingLinkRow("常用地點") { showLocationsDialog = true }
+                    HorizontalDivider(color = DividerColor)
+                    SettingLinkRow("使用說明") { showGuideDialog = true }
+                    HorizontalDivider(color = DividerColor)
+                    SettingLinkRow("隱私權政策") {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(PRIVACY_URL)
+                            )
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(32.dp))
@@ -304,7 +320,55 @@ fun SettingsScreen() {
             }
         )
     }
+
+    // ── 使用說明 彈跳視窗 ──────────────────────────────────────────────────
+    if (showGuideDialog) {
+        InfoDialog("使用說明", USER_GUIDE_TEXT) { showGuideDialog = false }
+    }
 }
+
+// ── 可捲動說明對話框（使用說明／隱私權政策共用）──────────────────────────────────
+@Composable
+private fun InfoDialog(title: String, content: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BgMain,
+        title = { Text(title, fontWeight = FontWeight.Bold, color = TextDark) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(content, color = TextDark, fontSize = 13.sp, lineHeight = 21.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("關閉", color = OrangeMain) }
+        }
+    )
+}
+
+private const val USER_GUIDE_TEXT =
+    "本App提供台灣即時空氣品質資訊與個人化健康防護，主要功能如下：\n\n" +
+    "1. 首頁\n" +
+    "- 顯示所在地區最近測站的即時 AQI 與空氣品質等級。\n" +
+    "- 點右上角圖示可切換「GPS 定位」或你設定的常用地點。\n\n" +
+    "2. AI 顧問\n" +
+    "- 依你的健康檔案與當前空品，提供個人化健康建議。\n\n" +
+    "3. 通報（中間橘色按鈕）\n" +
+    "- 發現火災、異味、揚塵等空污事件，可填寫地點與描述向社群通報。\n\n" +
+    "4. 通知中心\n" +
+    "- 查看空品預報、警報，以及附近的民眾回報。\n" +
+    "- 點右上角地圖圖示，可看官方火災警示與回報熱點地圖。\n\n" +
+    "5. 設定\n" +
+    "- 開關每日空氣品質通知並設定推播時間。\n" +
+    "- 編輯個人健康檔案（僅儲存於本機）。\n" +
+    "- 新增常用地點，方便快速切換查詢。"
+
+// 隱私權政策完整版網頁（設定頁點擊後以瀏覽器開啟）
+private const val PRIVACY_URL =
+    "https://yu-peihsuan.github.io/AirQuality-privacy-policy/privacy_site/PrivacyPolicy.html"
 
 // ── 個人健康檔案 Dialog ──────────────────────────────────────────────────────
 
@@ -329,16 +393,10 @@ private fun HealthProfileDialog(
         text = {
             Column {
                 Text(
-                    "此資料將用於 AI (RAG) 分析，提供個人化健康建議",
-                    color = TextGray, fontSize = 13.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Text(
-                    "🔒 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會將相關健康屬性傳送至伺服器以生成建議。",
+                    "⚠️ 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會將相關健康屬性傳送至伺服器以生成建議。",
                     color = TextGray, fontSize = 12.sp,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
-
                 HealthFieldLabel("年齡層")
                 SingleSelectChipRow(ageGroups, selectedAgeGroup, onAgeGroupChange)
 
@@ -422,7 +480,11 @@ private fun LocationsDialog(
                     modifier = Modifier.padding(vertical = 14.dp)
                 )
             } else {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     filled.forEachIndexed { idx, fav ->
                         Row(
                             modifier = Modifier

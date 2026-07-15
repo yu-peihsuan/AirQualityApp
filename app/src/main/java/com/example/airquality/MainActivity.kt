@@ -34,6 +34,12 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onStop() {
+        super.onStop()
+        // App 退到背景時才切換桌面圖示（前景切換會把使用者踢回桌面）
+        AppIconManager.applyPending(this)
+    }
 }
 
 @Composable
