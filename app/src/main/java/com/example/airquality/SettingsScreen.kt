@@ -331,16 +331,10 @@ private fun HealthProfileDialog(
         text = {
             Column {
                 Text(
-                    "此資料將用於 AI (RAG) 分析，提供個人化健康建議",
-                    color = TextGray, fontSize = 13.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Text(
-                    "🔒 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會將相關健康屬性傳送至伺服器以生成建議。",
+                    "⚠️ 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會將相關健康屬性傳送至伺服器以生成建議。",
                     color = TextGray, fontSize = 12.sp,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
-
                 HealthFieldLabel("年齡層")
                 SingleSelectChipRow(ageGroups, selectedAgeGroup, onAgeGroupChange)
 
