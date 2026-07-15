@@ -182,7 +182,7 @@ fun HomeScreen(
                         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
                     ) {
                         LocationOption(
-                            "📍", "GPS 定位", "自動偵測目前位置",
+                            "GPS 定位", "自動偵測目前位置",
                             selected = currentLocationName == "GPS 定位"
                         ) {
                             showLocationDialog = false
@@ -191,7 +191,7 @@ fun HomeScreen(
                         }
                         favLocations.forEach { (name, address) ->
                             LocationOption(
-                                "📌", name, address,
+                                name, address,
                                 selected = currentLocationName == name
                             ) {
                                 showLocationDialog = false
@@ -564,7 +564,6 @@ private fun loadInitialLocation(context: Context, viewModel: HomeViewModel) {
 
 @Composable
 private fun LocationOption(
-    emoji: String,
     name: String,
     subtitle: String,
     selected: Boolean = false,
