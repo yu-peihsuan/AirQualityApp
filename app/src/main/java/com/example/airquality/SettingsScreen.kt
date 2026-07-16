@@ -96,8 +96,13 @@ fun SettingsScreen() {
             // ── Header ────────────────────────────────────────────────────
             AppHeader(title = "設定")
 
-            // ── 主內容（不捲動，僅精簡列表 + 彈跳視窗）───────────────────
-            Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+            // ── 主內容（可捲動：小螢幕或字體放大時，下方項目才不會被切掉）──
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+            ) {
                 Spacer(Modifier.height(24.dp))
 
                 // ── 通知設定（常用，直接顯示）───────────────────────────
