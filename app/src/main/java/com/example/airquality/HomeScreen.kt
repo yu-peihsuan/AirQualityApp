@@ -80,25 +80,29 @@ fun HomeScreen(
     // 管理當前顯示的日期，讓它可以在回到畫面時更新
     var currentDateString by remember { mutableStateOf(getCurrentDateString()) }
 
-    // 權限請求 launcher：依實際定位權限狀態決定初始資料來源
-    // （用實際狀態而非結果 map，因為此請求可能只含通知權限而不含定位）
+    // 權限請求 launcher：權限流程結束後，一律依「持久化的選擇」載入——
+    // 手動選過地區就用該地區（與定位權限無關）；GPS 模式才看定位權限，
+    // 無權限由 fetchWithGps 內部退預設位置。避免像過去寫死台北市而蓋掉使用者選擇。
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
+        loadInitialLocation(context, viewModel)
+
+        // 未授權定位、也沒選過任何地區 → 引導使用者必須自行選擇一個常用地點
         val hasLocation = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
-        if (hasLocation) {
-            loadInitialLocation(context, viewModel)
-        } else {
-            viewModel.fetchAirQuality(context, "台北市")
+        if (!hasLocation && !hasSavedChoice(context)) {
+            Toast.makeText(context, "未開啟定位權限，請新增並選擇一個常用地點", Toast.LENGTH_LONG).show()
+            showLocationDialog = true
         }
     }
 
-    // 第一次進入 App 時，一次要求尚未授權的定位與通知權限
+    // 第一次進入 App：一次要求尚未授權的定位與通知權限；
+    // 若全部已授權則直接載入（單一初始載入決策點，避免兩條路互相覆蓋）
     LaunchedEffect(Unit) {
         val perms = mutableListOf<String>()
         val hasLocation = ContextCompat.checkSelfPermission(
@@ -116,7 +120,9 @@ fun HomeScreen(
             perms += Manifest.permission.POST_NOTIFICATIONS
         }
         if (perms.isNotEmpty()) {
-            permissionLauncher.launch(perms.toTypedArray())
+            permissionLauncher.launch(perms.toTypedArray())   // 載入交由上方回呼處理
+        } else {
+            loadInitialLocation(context, viewModel)
         }
     }
 
@@ -140,15 +146,14 @@ fun HomeScreen(
                 } else if (viewModel.isGpsMode) {
                     fetchWithGps(context, viewModel)
                 } else {
-                    viewModel.refreshSavedLocation()
+                    viewModel.refreshSavedLocation(context)
                 }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        // 第一次進入依上次持久化的選擇載入（手動地區則沿用該地區，否則 GPS 自動定位）
+        // 初始載入由上方 LaunchedEffect／權限回呼統一處理（單一決策點）
         currentDateString = getCurrentDateString()
-        loadInitialLocation(context, viewModel)
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -209,7 +214,7 @@ fun HomeScreen(
                             ) {
                                 showLocationDialog = false
                                 saveLocationChoice(context, "saved", name, address)
-                                viewModel.switchToSavedLocation(name, address)
+                                viewModel.switchToSavedLocation(context, name, address)
                             }
                         }
                         if (favLocations.isEmpty()) {
@@ -567,10 +572,17 @@ private fun loadInitialLocation(context: Context, viewModel: HomeViewModel) {
     val mode = lp.getString("location_mode", "gps") ?: "gps"
     val address = lp.getString("location_address", "") ?: ""
     if (mode == "saved" && address.isNotBlank()) {
-        viewModel.switchToSavedLocation(lp.getString("location_name", "") ?: "", address)
+        viewModel.switchToSavedLocation(context, lp.getString("location_name", "") ?: "", address)
     } else {
         fetchWithGps(context, viewModel)
     }
+}
+
+/** 是否已手動選擇過地區（持久化為 saved 模式且有地址）。 */
+private fun hasSavedChoice(context: Context): Boolean {
+    val lp = context.getSharedPreferences(LOCATION_PREF, Context.MODE_PRIVATE)
+    return lp.getString("location_mode", "gps") == "saved" &&
+        !lp.getString("location_address", "").isNullOrBlank()
 }
 
 // ── 地點選項 ──────────────────────────────────────────────────────────────────

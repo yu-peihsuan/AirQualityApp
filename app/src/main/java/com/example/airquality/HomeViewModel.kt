@@ -90,13 +90,13 @@ class HomeViewModel : ViewModel() {
     val isGpsMode: Boolean
         get() = _currentLocationName.value == "GPS 定位"
 
-    fun refreshSavedLocation() {
+    fun refreshSavedLocation(context: Context) {
         if (_savedLocationAddress.isNotEmpty()) {
-            switchToSavedLocation(_savedLocationName, _savedLocationAddress)
+            switchToSavedLocation(context, _savedLocationName, _savedLocationAddress)
         }
     }
 
-    fun switchToSavedLocation(name: String, address: String) {
+    fun switchToSavedLocation(context: Context, name: String, address: String) {
         _savedLocationName = name
         _savedLocationAddress = address
         _currentLocationName.value = name   // 同步設定，讓 isGpsMode 立即反映手動選擇
@@ -107,8 +107,9 @@ class HomeViewModel : ViewModel() {
                 if (coords == null) {
                     _userMessage.tryEmit("找不到「$name」的位置（地址搜尋暫時無法使用），暫以台北市資料顯示")
                 }
-                val lat = coords?.first ?: 25.032969
-                val lng = coords?.second ?: 121.516039
+                // 預設位置：台北市中心（北緯 25°05'14"、東經 121°33'20"）
+                val lat = coords?.first ?: 25.087222
+                val lng = coords?.second ?: 121.555556
                 val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
                 val aqiRecords  = aqiResponse.records ?: emptyList()
                 if (aqiRecords.isEmpty()) throw Exception("沒有取得 AQI 資料")
@@ -120,6 +121,10 @@ class HomeViewModel : ViewModel() {
                 _userLat = lat
                 _userLng = lng
                 AppLocationState.update(lat, lng)
+                // 手動切換地區也更新 FCM Token 的縣市與座標，
+                // 讓推播（每日摘要、警報、附近回報）依「當下選擇的地區」發送，
+                // 不需定位權限也能收到所選地區的通知
+                TokenManager.uploadTokenWithCounty(context, nearestAqi.county, lat, lng)
                 try {
                     val weather = RetrofitClient.apiService.getWeather(
                         county = nearestAqi.county,
@@ -324,10 +329,11 @@ class HomeViewModel : ViewModel() {
     }
 
     // 統一取得經緯度（正向地理編碼：地址 → 座標）
+    // 預設位置：台北市中心（北緯 25°05'14"、東經 121°33'20"）
     private suspend fun getCoordinates(context: Context?, address: String): Triple<Double, Double, String> {
-        var lat = 25.032969
-        var lng = 121.516039
-        var region = "臺北市中正區"
+        var lat = 25.087222
+        var lng = 121.555556
+        var region = "台北市"
 
         if (address.isNotBlank()) {
             val result = googleForwardGeocode(address)
