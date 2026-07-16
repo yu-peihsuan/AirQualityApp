@@ -469,9 +469,12 @@ fun HomeScreen(
                     val chips = remember(aqiBand, hasAsthma, hasCardiovascular, isRaining) {
                         getActionChips(aqiBand, hasAsthma, hasCardiovascular, isRaining)
                     }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         chips.forEach { (icon, label) ->
-                            ActionChip(icon, label, aqiColor)
+                            ActionChip(icon, label, aqiColor, Modifier.weight(1f))
                         }
                     }
                 }
@@ -615,17 +618,19 @@ fun DrawScope.drawDynamicFace(aqiValue: Int) {
 // ── 行動按鈕卡片 ─────────────────────────────────────────────────────────
 
 @Composable
-fun ActionChip(iconRes: Int, label: String, color: Color) {
+fun ActionChip(iconRes: Int, label: String, color: Color, modifier: Modifier = Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier
+        // 寬度由父層 weight 均分、高度設最小值——不同螢幕寬度與系統字體
+        // 放大時能自動適應，文字過長會換行而不是被截掉
+        modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .background(color.copy(alpha = 0.15f)) // 背景依 AQI 顏色透明化
             .clickable {}
             .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(20.dp)) // 外框依 AQI 顏色
-            .height(130.dp) // 給定固定的高度讓它長一點
-            .width(110.dp)   // 把寬度稍微縮回來，讓三個框距比較開
+            .defaultMinSize(minHeight = 130.dp)
+            .padding(horizontal = 4.dp, vertical = 10.dp)
     ) {
         androidx.compose.foundation.Image(
             painter = androidx.compose.ui.res.painterResource(id = iconRes),
@@ -722,7 +727,7 @@ private fun LocationOption(
                 color = if (selected) OrangeMain else TextDark)
             Text(
                 subtitle, fontSize = 12.sp, color = TextGray,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
         }
