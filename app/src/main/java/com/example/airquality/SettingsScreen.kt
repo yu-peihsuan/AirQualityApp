@@ -96,8 +96,13 @@ fun SettingsScreen() {
             // ── Header ────────────────────────────────────────────────────
             AppHeader(title = "設定")
 
-            // ── 主內容（不捲動，僅精簡列表 + 彈跳視窗）───────────────────
-            Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+            // ── 主內容（可捲動：小螢幕或字體放大時，下方項目才不會被切掉）──
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+            ) {
                 Spacer(Modifier.height(24.dp))
 
                 // ── 通知設定（常用，直接顯示）───────────────────────────
@@ -391,7 +396,12 @@ private fun HealthProfileDialog(
         containerColor = BgMain,
         title = { Text("個人健康檔案", fontWeight = FontWeight.Bold, color = TextDark) },
         text = {
-            Column {
+            // 可捲動：小螢幕或系統字體放大時，內容超出對話框高度仍可完整檢視
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Text(
                     "⚠️ 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會將相關健康屬性傳送至伺服器以生成建議。",
                     color = TextGray, fontSize = 12.sp,
@@ -524,14 +534,18 @@ private fun HealthFieldLabel(text: String) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SingleSelectChipRow(
     options: List<String>,
     selected: String,
     onSelect: (String) -> Unit
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // FlowRow：小螢幕或字體放大時放不下就換行，避免 chip 被壓成直排
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         options.forEach { opt ->
             FilterChip(
                 selected = selected == opt,

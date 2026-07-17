@@ -75,30 +75,59 @@ fun HomeScreen(
     val isRaining           by viewModel.isRaining.collectAsState()
     val currentLocationName by viewModel.currentLocationName.collectAsState()
     var showLocationDialog  by remember { mutableStateOf(false) }
+    // 首頁直接新增常用地點（不必進設定頁）
+    var showAddLocationDialog by remember { mutableStateOf(false) }
+    var addLocName    by remember { mutableStateOf("") }
+    var addLocAddress by remember { mutableStateOf("") }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // 管理當前顯示的日期，讓它可以在回到畫面時更新
     var currentDateString by remember { mutableStateOf(getCurrentDateString()) }
 
-    // 權限請求 launcher：依實際定位權限狀態決定初始資料來源
-    // （用實際狀態而非結果 map，因為此請求可能只含通知權限而不含定位）
+    // 權限請求 launcher：權限流程結束後，一律依「持久化的選擇」載入——
+    // 手動選過地區就用該地區（與定位權限無關）；GPS 模式才看定位權限，
+    // 無權限由 fetchWithGps 內部退預設位置。避免像過去寫死台北市而蓋掉使用者選擇。
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
+        loadInitialLocation(context, viewModel)
+
+        // 未授權定位、也沒選過任何地區 → 引導使用者必須自行選擇一個常用地點
         val hasLocation = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
-        if (hasLocation) {
-            loadInitialLocation(context, viewModel)
-        } else {
-            viewModel.fetchAirQuality(context, "台北市")
+        if (!hasLocation && !hasSavedChoice(context)) {
+            // Toast 於 Android 12+ 僅顯示兩行，文字須精簡避免被截斷
+            Toast.makeText(context, "未開啟定位，請選擇常用地點", Toast.LENGTH_LONG).show()
+            showLocationDialog = true
         }
     }
 
-    // 第一次進入 App 時，一次要求尚未授權的定位與通知權限
+    // 使用者在切換地點對話框主動選「GPS 定位」但尚未授權定位時使用：
+    // 允許 → 切換至 GPS；拒絕 → 維持原本地區並提示
+    val gpsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            saveLocationChoice(context, "gps", "", "")
+            viewModel.switchToGps(context)
+        } else {
+            // Toast 於 Android 12+ 僅顯示兩行，文字須精簡避免被截斷
+            Toast.makeText(context, "未取得定位權限，請至系統設定開啟", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // 第一次進入 App：一次要求尚未授權的定位與通知權限；
+    // 若全部已授權則直接載入（單一初始載入決策點，避免兩條路互相覆蓋）
     LaunchedEffect(Unit) {
         val perms = mutableListOf<String>()
         val hasLocation = ContextCompat.checkSelfPermission(
@@ -116,7 +145,9 @@ fun HomeScreen(
             perms += Manifest.permission.POST_NOTIFICATIONS
         }
         if (perms.isNotEmpty()) {
-            permissionLauncher.launch(perms.toTypedArray())
+            permissionLauncher.launch(perms.toTypedArray())   // 載入交由上方回呼處理
+        } else {
+            loadInitialLocation(context, viewModel)
         }
     }
 
@@ -140,15 +171,14 @@ fun HomeScreen(
                 } else if (viewModel.isGpsMode) {
                     fetchWithGps(context, viewModel)
                 } else {
-                    viewModel.refreshSavedLocation()
+                    viewModel.refreshSavedLocation(context)
                 }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        // 第一次進入依上次持久化的選擇載入（手動地區則沿用該地區，否則 GPS 自動定位）
+        // 初始載入由上方 LaunchedEffect／權限回呼統一處理（單一決策點）
         currentDateString = getCurrentDateString()
-        loadInitialLocation(context, viewModel)
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -186,7 +216,22 @@ fun HomeScreen(
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { showLocationDialog = false },
                 containerColor = BgMain,
-                title = { Text("切換地點", fontWeight = FontWeight.Bold, color = TextDark) },
+                title = {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("切換地點", fontWeight = FontWeight.Bold, color = TextDark)
+                        androidx.compose.material3.TextButton(onClick = {
+                            addLocName = ""
+                            addLocAddress = ""
+                            showAddLocationDialog = true
+                        }) {
+                            Text("＋ 新增", color = OrangeMain, fontSize = 14.sp)
+                        }
+                    }
+                },
                 text = {
                     androidx.compose.foundation.layout.Column(
                         modifier = Modifier
@@ -199,8 +244,22 @@ fun HomeScreen(
                             selected = currentLocationName == "GPS 定位"
                         ) {
                             showLocationDialog = false
-                            saveLocationChoice(context, "gps", "", "")
-                            viewModel.switchToGps(context)
+                            val hasLocation = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED ||
+                                ContextCompat.checkSelfPermission(
+                                    context, Manifest.permission.ACCESS_COARSE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
+                            if (hasLocation) {
+                                saveLocationChoice(context, "gps", "", "")
+                                viewModel.switchToGps(context)
+                            } else {
+                                // 尚未授權定位 → 跳出系統權限詢問（結果由 gpsPermissionLauncher 處理）
+                                gpsPermissionLauncher.launch(arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                ))
+                            }
                         }
                         favLocations.forEach { (name, address) ->
                             LocationOption(
@@ -209,17 +268,75 @@ fun HomeScreen(
                             ) {
                                 showLocationDialog = false
                                 saveLocationChoice(context, "saved", name, address)
-                                viewModel.switchToSavedLocation(name, address)
+                                viewModel.switchToSavedLocation(context, name, address)
                             }
                         }
                         if (favLocations.isEmpty()) {
-                            Text("尚未設定常用地點，請至「設定」頁面新增。",
+                            Text("尚未設定常用地點，點右上「＋ 新增」即可加入。",
                                 color = TextGray, fontSize = 13.sp,
                                 modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
                         }
                     }
                 },
                 confirmButton = {}
+            )
+        }
+
+        // ── 新增常用地點 Dialog（首頁直接新增，儲存後立即切換過去）──────
+        if (showAddLocationDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showAddLocationDialog = false },
+                containerColor = BgMain,
+                title = { Text("新增常用地點", fontWeight = FontWeight.Bold, color = TextDark) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.OutlinedTextField(
+                            value = addLocName,
+                            onValueChange = { addLocName = it },
+                            label = { Text("名稱") },
+                            placeholder = { Text("例如：家、公司", color = TextGray, fontSize = 13.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = addLocAddress,
+                            onValueChange = { addLocAddress = it },
+                            label = { Text("地址") },
+                            placeholder = { Text("例如：台北市中正區重慶南路一段122號", color = TextGray, fontSize = 13.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        val n = addLocName.trim()
+                        val a = addLocAddress.trim()
+                        if (n.isNotEmpty() && a.isNotEmpty()) {
+                            // 與設定頁共用同一份常用地點儲存（附加到清單尾端）
+                            val prefs = context.getSharedPreferences("health_profile", Context.MODE_PRIVATE)
+                            val count = prefs.getInt("fav_count", 0)
+                            prefs.edit()
+                                .putString("fav_${count + 1}_name", n)
+                                .putString("fav_${count + 1}_address", a)
+                                .putInt("fav_count", count + 1)
+                                .apply()
+                            showAddLocationDialog = false
+                            showLocationDialog = false
+                            saveLocationChoice(context, "saved", n, a)
+                            viewModel.switchToSavedLocation(context, n, a)
+                        } else {
+                            Toast.makeText(context, "請填寫名稱與地址", Toast.LENGTH_SHORT).show()
+                        }
+                    }) { Text("儲存並切換", color = OrangeMain) }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showAddLocationDialog = false }) {
+                        Text("取消", color = TextGray)
+                    }
+                }
             )
         }
 
@@ -350,9 +467,12 @@ fun HomeScreen(
                     val chips = remember(aqiBand, hasAsthma, hasCardiovascular, isRaining) {
                         getActionChips(aqiBand, hasAsthma, hasCardiovascular, isRaining)
                     }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         chips.forEach { (icon, label) ->
-                            ActionChip(icon, label, aqiColor)
+                            ActionChip(icon, label, aqiColor, Modifier.weight(1f))
                         }
                     }
                 }
@@ -496,17 +616,19 @@ fun DrawScope.drawDynamicFace(aqiValue: Int) {
 // ── 行動按鈕卡片 ─────────────────────────────────────────────────────────
 
 @Composable
-fun ActionChip(iconRes: Int, label: String, color: Color) {
+fun ActionChip(iconRes: Int, label: String, color: Color, modifier: Modifier = Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier
+        // 寬度由父層 weight 均分、高度設最小值——不同螢幕寬度與系統字體
+        // 放大時能自動適應，文字過長會換行而不是被截掉
+        modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .background(color.copy(alpha = 0.15f)) // 背景依 AQI 顏色透明化
             .clickable {}
             .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(20.dp)) // 外框依 AQI 顏色
-            .height(130.dp) // 給定固定的高度讓它長一點
-            .width(110.dp)   // 把寬度稍微縮回來，讓三個框距比較開
+            .defaultMinSize(minHeight = 130.dp)
+            .padding(horizontal = 4.dp, vertical = 10.dp)
     ) {
         androidx.compose.foundation.Image(
             painter = androidx.compose.ui.res.painterResource(id = iconRes),
@@ -567,10 +689,17 @@ private fun loadInitialLocation(context: Context, viewModel: HomeViewModel) {
     val mode = lp.getString("location_mode", "gps") ?: "gps"
     val address = lp.getString("location_address", "") ?: ""
     if (mode == "saved" && address.isNotBlank()) {
-        viewModel.switchToSavedLocation(lp.getString("location_name", "") ?: "", address)
+        viewModel.switchToSavedLocation(context, lp.getString("location_name", "") ?: "", address)
     } else {
         fetchWithGps(context, viewModel)
     }
+}
+
+/** 是否已手動選擇過地區（持久化為 saved 模式且有地址）。 */
+private fun hasSavedChoice(context: Context): Boolean {
+    val lp = context.getSharedPreferences(LOCATION_PREF, Context.MODE_PRIVATE)
+    return lp.getString("location_mode", "gps") == "saved" &&
+        !lp.getString("location_address", "").isNullOrBlank()
 }
 
 // ── 地點選項 ──────────────────────────────────────────────────────────────────
@@ -596,7 +725,7 @@ private fun LocationOption(
                 color = if (selected) OrangeMain else TextDark)
             Text(
                 subtitle, fontSize = 12.sp, color = TextGray,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
         }

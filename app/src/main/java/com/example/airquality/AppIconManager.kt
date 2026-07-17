@@ -51,15 +51,18 @@ object AppIconManager {
 
         val pm = context.packageManager
         try {
-            ALL_ALIASES.forEach { alias ->
-                val state = if (alias == target) {
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                } else {
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                }
+            // 順序很重要：先啟用新圖示、再停用其他。
+            // 若先停用舊的，會出現「沒有任何啟用中的桌面入口」的空窗，
+            // 部分廠牌桌面在該瞬間會退回顯示 manifest 預設圖示且不再更新（圖示卡死）。
+            pm.setComponentEnabledSetting(
+                ComponentName(context.packageName, "$ALIAS_PACKAGE.$target"),
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP,
+            )
+            ALL_ALIASES.filter { it != target }.forEach { alias ->
                 pm.setComponentEnabledSetting(
                     ComponentName(context.packageName, "$ALIAS_PACKAGE.$alias"),
-                    state,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                     PackageManager.DONT_KILL_APP,
                 )
             }

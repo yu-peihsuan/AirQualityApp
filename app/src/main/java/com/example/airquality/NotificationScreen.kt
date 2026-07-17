@@ -286,8 +286,9 @@ private fun NotifItem(
                     text     = subtitle,
                     fontSize = 13.sp,
                     color    = TextMid,
-                    // 民眾回報顯示完整描述（可多行）；其他類別維持單行摘要
-                    maxLines = if (group == NotifGroup.REPORT) 10 else 1,
+                    // 民眾回報顯示完整描述；其他類別最多 3 行，
+                    // 避免小螢幕或字體放大時內容被截成單行吃字
+                    maxLines = if (group == NotifGroup.REPORT) 10 else 3,
                     overflow = TextOverflow.Ellipsis
                 )
             }
