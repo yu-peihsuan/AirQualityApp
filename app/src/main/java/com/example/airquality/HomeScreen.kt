@@ -100,7 +100,8 @@ fun HomeScreen(
                 context, Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         if (!hasLocation && !hasSavedChoice(context)) {
-            Toast.makeText(context, "未開啟定位權限，請新增並選擇一個常用地點", Toast.LENGTH_LONG).show()
+            // Toast 於 Android 12+ 僅顯示兩行，文字須精簡避免被截斷
+            Toast.makeText(context, "未開啟定位，請選擇常用地點", Toast.LENGTH_LONG).show()
             showLocationDialog = true
         }
     }
@@ -120,11 +121,8 @@ fun HomeScreen(
             saveLocationChoice(context, "gps", "", "")
             viewModel.switchToGps(context)
         } else {
-            Toast.makeText(
-                context,
-                "未取得定位權限，維持目前地區。若系統未再詢問，請至系統設定開啟。",
-                Toast.LENGTH_LONG
-            ).show()
+            // Toast 於 Android 12+ 僅顯示兩行，文字須精簡避免被截斷
+            Toast.makeText(context, "未取得定位權限，請至系統設定開啟", Toast.LENGTH_LONG).show()
         }
     }
 
