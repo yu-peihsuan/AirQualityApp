@@ -83,7 +83,7 @@ class ReportViewModel : ViewModel() {
         _locationFetchState.value = LocationFetchState.Idle
     }
 
-    fun submitReport(context: Context, location: String, category: String, description: String) {
+    fun submitReport(location: String, category: String, description: String) {
         if (location.isBlank() || category.isBlank() || description.isBlank()) {
             _uiState.value = ReportUiState.Error("請填寫所有欄位")
             return
@@ -97,17 +97,15 @@ class ReportViewModel : ViewModel() {
                 } else {
                     forwardGeocode(location)
                 }
-                val deviceId = android.provider.Settings.Secure.getString(
-                    context.contentResolver, android.provider.Settings.Secure.ANDROID_ID
-                )
+                // 裝置身分改由 access token 提供（見 AuthManager），
+                // 這裡不再讀取或送出 ANDROID_ID。
                 val response = RetrofitClient.apiService.submitReport(
                     ReportRequest(
                         location = location,
                         category = category,
                         description = description,
                         latitude = coords?.first,
-                        longitude = coords?.second,
-                        deviceId = deviceId
+                        longitude = coords?.second
                     )
                 )
                 if (response.status != "success") {

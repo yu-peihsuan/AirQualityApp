@@ -81,6 +81,10 @@ dependencies {
     // Retrofit 與 Gson 轉換器 (用於打 API 並將 JSON 轉為 Kotlin 物件)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // OkHttp：明確指定 4.x（Retrofit 2.9 預設帶的是 3.x），
+    // 供 AuthInterceptor 附加憑證與 TokenAuthenticator 在 401 時自動續期使用
+    implementation(platform("com.squareup.okhttp3:okhttp-bom:4.12.0"))
+    implementation("com.squareup.okhttp3:okhttp")
     
     // ViewModel Compose (用於管理畫面狀態)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
