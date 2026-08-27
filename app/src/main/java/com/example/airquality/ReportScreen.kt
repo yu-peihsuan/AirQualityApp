@@ -227,7 +227,7 @@ fun ReportScreen(
                     ) { Text("取消", color = TextMid) }
 
                     Button(
-                        onClick = { reportViewModel.submitReport(context, location, category, description) },
+                        onClick = { reportViewModel.submitReport(location, category, description) },
                         enabled = !isLoading,
                         modifier = Modifier.weight(2f).height(50.dp),
                         shape = RoundedCornerShape(12.dp),

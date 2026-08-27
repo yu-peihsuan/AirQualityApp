@@ -1,5 +1,6 @@
 package com.example.airquality
 
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
@@ -67,8 +68,9 @@ data class ReportRequest(
     val category: String,
     val description: String,
     val latitude: Double? = null,
-    val longitude: Double? = null,
-    @SerializedName("device_id") val deviceId: String? = null
+    val longitude: Double? = null
+    // 不再送出 device_id：後端改由 access token 取得裝置身分，
+    // 客戶端自報的識別碼無法作為回報頻率限制的依據。
 )
 
 data class ReportResponse(
@@ -275,13 +277,28 @@ interface AirQualityApiService {
 
 // ── Retrofit 連線實體 ─────────────────────────────────────────────────────────
 
+// 正式後端（Cloud Run，台灣機房）；本機開發時可暫時改回 http://10.0.2.2:8000/
+// 放在檔案層級，讓 AuthManager 的認證用 Retrofit 實體共用同一個位址。
+internal const val BASE_URL = "https://airquality-api-968727437042.asia-east1.run.app/"
+
 object RetrofitClient {
-    // 正式後端（Cloud Run，台灣機房）；本機開發時可暫時改回 http://10.0.2.2:8000/
-    private const val BASE_URL = "https://airquality-api-968727437042.asia-east1.run.app/"
+
+    /**
+     * AuthInterceptor 為每個請求附上裝置憑證；
+     * TokenAuthenticator 在後端回 401 時自動續期並重送一次。
+     * 呼叫端（ViewModel／畫面）因此不需要知道 token 的存在。
+     */
+    private val client: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor())
+            .authenticator(TokenAuthenticator())
+            .build()
+    }
 
     val apiService: AirQualityApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(AirQualityApiService::class.java)
