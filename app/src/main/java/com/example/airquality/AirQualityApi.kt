@@ -164,6 +164,24 @@ data class DailyNotificationResponse(
     val message: String? = null
 )
 
+/**
+ * AQI 即時警示門檻。threshold=null 代表回到預設值
+ * （後端依健康檔案決定：敏感族群 101、其他人 151）。
+ *
+ * 門檻只能讓使用者比預設更早收到、不會延後——設成 200 的人仍然會在
+ * AQI 151 收到原本就該收到的警示。effectiveThreshold 是後端算完的實際生效值。
+ */
+data class AlertThresholdRequest(
+    val token: String,
+    val threshold: Int? = null
+)
+
+data class AlertThresholdResponse(
+    val status: String,
+    val message: String? = null,
+    @SerializedName("effective_threshold") val effectiveThreshold: Int? = null
+)
+
 data class DailyNotificationTestRequest(
     val token: String
 )
@@ -260,6 +278,9 @@ interface AirQualityApiService {
 
     @POST("api/fcm/daily-notification/test")
     suspend fun testDailyNotification(@Body request: DailyNotificationTestRequest): DailyNotificationTestResponse
+
+    @PUT("api/fcm/alert-threshold")
+    suspend fun setAlertThreshold(@Body request: AlertThresholdRequest): AlertThresholdResponse
 
     @GET("api/air_quality/estimate")
     suspend fun getAqiEstimate(

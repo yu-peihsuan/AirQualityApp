@@ -37,6 +37,32 @@ fun SettingsScreen() {
     var dailyMinute by remember { mutableIntStateOf(notifPrefs.getInt("daily_minute", 0)) }
     var showTimePicker by remember { mutableStateOf(false) }
 
+    // AQI 警示門檻。存 -1 代表「使用預設」（SharedPreferences 沒有 nullable Int）
+    var alertThreshold by remember {
+        mutableIntStateOf(notifPrefs.getInt("alert_threshold", -1))
+    }
+    var effectiveThreshold by remember {
+        mutableIntStateOf(notifPrefs.getInt("alert_threshold_effective", -1))
+    }
+    var showThresholdDialog by remember { mutableStateOf(false) }
+
+    fun syncAlertThreshold(threshold: Int?) {
+        val token = TokenManager.getToken(context) ?: return
+        scope.launch {
+            try {
+                val resp = RetrofitClient.apiService.setAlertThreshold(
+                    AlertThresholdRequest(token = token, threshold = threshold)
+                )
+                // 後端會把個人門檻與預設取較小值，回傳實際生效的數字；
+                // 顯示這個值，使用者才不會以為「設成 200」就不會收到 151 的警示。
+                resp.effectiveThreshold?.let {
+                    effectiveThreshold = it
+                    notifPrefs.edit().putInt("alert_threshold_effective", it).apply()
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun syncDailyNotification(enabled: Boolean, hour: Int, minute: Int) {
         val token = TokenManager.getToken(context) ?: return
         scope.launch {
@@ -138,6 +164,36 @@ fun SettingsScreen() {
                             )
                         }
                     }
+
+                    HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
+                    Text(
+                        "空氣品質惡化到指定程度時，立刻收到警示通知",
+                        color = TextGray, fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    )
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { showThresholdDialog = true }
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("空氣警示門檻", color = TextDark, fontSize = 16.sp)
+                        Text(
+                            thresholdLabel(alertThreshold),
+                            color = OrangeMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    // 個人門檻只能讓自己更早收到：設得比預設高時，實際生效的
+                    // 仍是預設值。把這個差異講明，不然使用者會覺得設定沒作用。
+                    if (effectiveThreshold > 0 && alertThreshold > effectiveThreshold) {
+                        Text(
+                            "實際生效：AQI ${effectiveThreshold} —— 門檻只能設得比預設更敏感，不會讓你更晚收到警示",
+                            color = TextGray, fontSize = 12.sp, lineHeight = 17.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -213,6 +269,19 @@ fun SettingsScreen() {
                     .apply()
                 showHealthDialog = false
                 scope.launch { snackbarHostState.showSnackbar("✅ 健康檔案已儲存於本機") }
+            }
+        )
+    }
+
+    if (showThresholdDialog) {
+        AlertThresholdDialog(
+            current = alertThreshold,
+            onDismiss = { showThresholdDialog = false },
+            onSelect = { value ->
+                alertThreshold = value
+                notifPrefs.edit().putInt("alert_threshold", value).apply()
+                syncAlertThreshold(if (value < 0) null else value)
+                showThresholdDialog = false
             }
         )
     }
@@ -522,6 +591,64 @@ private fun LocationsDialog(
 }
 
 // ── 輔助 Composable ────────────────────────────────────────────────────────
+
+// 門檻選項。只列比預設更敏感的值——設得比預設高不會有任何效果
+// （後端取 min(個人, 預設)），列出來只會讓人以為自己關掉了警示。
+private val THRESHOLD_OPTIONS = listOf(
+    -1  to ("預設"        to "依你的健康檔案自動調整（有健康狀況者 AQI 101，其他人 151）"),
+    51  to ("AQI 51 以上"  to "空氣一離開「良好」就通知，最敏感"),
+    101 to ("AQI 101 以上" to "達到「對敏感族群不健康」時通知"),
+    151 to ("AQI 151 以上" to "達到「對所有族群不健康」時通知"),
+)
+
+private fun thresholdLabel(value: Int): String =
+    THRESHOLD_OPTIONS.firstOrNull { it.first == value }?.second?.first ?: "AQI $value 以上"
+
+@Composable
+private fun AlertThresholdDialog(
+    current: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BgMain,
+        title = { Text("空氣警示門檻", fontWeight = FontWeight.Bold, color = TextDark) },
+        text = {
+            Column {
+                Text(
+                    "AQI 漲過你選的數字時，會立刻收到一次警示；空品持續不好不會重複通知。",
+                    color = TextGray, fontSize = 13.sp, lineHeight = 19.sp,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                THRESHOLD_OPTIONS.forEach { (value, text) ->
+                    val (label, desc) = text
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(value) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = current == value,
+                            onClick = { onSelect(value) },
+                            colors = RadioButtonDefaults.colors(selectedColor = OrangeMain)
+                        )
+                        Column(Modifier.padding(start = 4.dp)) {
+                            Text(label, color = TextDark, fontSize = 15.sp,
+                                 fontWeight = FontWeight.SemiBold)
+                            Text(desc, color = TextGray, fontSize = 12.sp, lineHeight = 17.sp)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("關閉", color = OrangeMain) }
+        }
+    )
+}
 
 @Composable
 private fun HealthFieldLabel(text: String) {
