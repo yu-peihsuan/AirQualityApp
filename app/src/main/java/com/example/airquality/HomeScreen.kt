@@ -814,7 +814,7 @@ private fun getActionChips(
 
 //取得當下時間
 fun getCurrentDateString(): String {
-    val calendar = Calendar.getInstance()
+    val calendar = Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Taipei"))
     val month = calendar.get(Calendar.MONTH) + 1
     val day = calendar.get(Calendar.DAY_OF_MONTH)
     val dayOfWeek = when (calendar.get(Calendar.DAY_OF_WEEK)) {

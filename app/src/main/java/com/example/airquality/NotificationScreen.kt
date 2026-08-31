@@ -27,11 +27,11 @@ import java.util.Locale
 private fun relativeTime(timestamp: String): String {
     if (timestamp.isBlank()) return ""
     return try {
-        val clean = timestamp
-            .replace(Regex("[+-]\\d{2}:\\d{2}$"), "")
-            .replace("Z", "")
-            .trim()
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+        val clean = timestamp.trim()
+            .replace(Regex("([+-]\\d{2}):(\\d{2})$"), "$1$2")
+            .replace(Regex("Z$"), "+0000")
+            .let { if (it.matches(Regex(".*[+-]\\d{4}$"))) it else "${it}+0800" }
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault())
         sdf.timeZone = java.util.TimeZone.getTimeZone("Asia/Taipei")
         val date = sdf.parse(clean) ?: return timestamp.take(10)
         val diff = System.currentTimeMillis() - date.time

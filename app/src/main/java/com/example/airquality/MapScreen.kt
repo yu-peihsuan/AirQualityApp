@@ -107,6 +107,7 @@ class MapViewModel : ViewModel() {
             // 處理 "2026-04-22T17:21:59+08:00" → "2026-04-22T17:21:59+0800"
             val normalized = ts.replace(Regex("([+-]\\d{2}):(\\d{2})$"), "$1$2")
             java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.getDefault())
+                .apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Taipei") }
                 .parse(normalized)?.time
         } catch (e: Exception) { null }
     }
