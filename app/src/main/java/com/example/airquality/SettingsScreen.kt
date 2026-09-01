@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.airquality.ui.theme.*
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private data class FavLocation(val name: String, val address: String)
 
@@ -38,13 +39,17 @@ fun SettingsScreen() {
     var showTimePicker by remember { mutableStateOf(false) }
 
     // AQI 警示門檻。存 -1 代表「使用預設」（SharedPreferences 沒有 nullable Int）
+    // -1 代表沒設定過；滑桿需要實際數字，用一般人的預設門檻 151 當起點
     var alertThreshold by remember {
-        mutableIntStateOf(notifPrefs.getInt("alert_threshold", -1))
+        mutableIntStateOf(notifPrefs.getInt("alert_threshold", -1).takeIf { it >= 0 } ?: 151)
     }
     var effectiveThreshold by remember {
         mutableIntStateOf(notifPrefs.getInt("alert_threshold_effective", -1))
     }
-    var showThresholdDialog by remember { mutableStateOf(false) }
+    // 開關關閉＝使用預設門檻（依健康檔案）；開啟＝用滑桿的自訂數值
+    var thresholdEnabled by remember {
+        mutableStateOf(notifPrefs.getInt("alert_threshold", -1) >= 0)
+    }
 
     fun syncAlertThreshold(threshold: Int?) {
         val token = TokenManager.getToken(context) ?: return
@@ -166,33 +171,78 @@ fun SettingsScreen() {
                     }
 
                     HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
-                    Text(
-                        "空氣品質惡化到指定程度時，立刻收到警示通知",
-                        color = TextGray, fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                    SettingSwitchRow(
+                        label = "當 AQI 高於此數值時通知我",
+                        checked = thresholdEnabled,
+                        onCheckedChange = { checked ->
+                            thresholdEnabled = checked
+                            if (checked) {
+                                notifPrefs.edit().putInt("alert_threshold", alertThreshold).apply()
+                                syncAlertThreshold(alertThreshold)
+                            } else {
+                                notifPrefs.edit().putInt("alert_threshold", -1).apply()
+                                syncAlertThreshold(null)   // 回到預設（依健康檔案）
+                            }
+                        }
                     )
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { showThresholdDialog = true }
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("空氣警示門檻", color = TextDark, fontSize = 16.sp)
-                        Text(
-                            thresholdLabel(alertThreshold),
-                            color = OrangeMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold
+                    if (thresholdEnabled) {
+                        val levelName = aqiLevelName(alertThreshold)
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                "$alertThreshold",
+                                color = getAqiColor(levelName),
+                                fontSize = 34.sp, fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                levelName,
+                                color = getAqiColor(levelName), fontSize = 14.sp,
+                                modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
+                            )
+                        }
+                        Slider(
+                            value = alertThreshold.toFloat(),
+                            onValueChange = {
+                                // 對齊 5 的倍數，滑桿才停得住在 100/150 這些分級界線上
+                                alertThreshold = (it / THRESHOLD_STEP).roundToInt() * THRESHOLD_STEP
+                            },
+                            // 只在放開手指時才打 API，拖曳過程不會連續送出請求
+                            onValueChangeFinished = {
+                                notifPrefs.edit().putInt("alert_threshold", alertThreshold).apply()
+                                syncAlertThreshold(alertThreshold)
+                            },
+                            valueRange = THRESHOLD_MIN.toFloat()..THRESHOLD_MAX.toFloat(),
+                            steps = (THRESHOLD_MAX - THRESHOLD_MIN) / THRESHOLD_STEP - 1,
+                            colors = SliderDefaults.colors(
+                                thumbColor = OrangeMain,
+                                activeTrackColor = OrangeMain
+                            )
                         )
-                    }
-                    // 個人門檻只能讓自己更早收到：設得比預設高時，實際生效的
-                    // 仍是預設值。把這個差異講明，不然使用者會覺得設定沒作用。
-                    if (effectiveThreshold > 0 && alertThreshold > effectiveThreshold) {
-                        Text(
-                            "實際生效：AQI ${effectiveThreshold} —— 門檻只能設得比預設更敏感，不會讓你更晚收到警示",
-                            color = TextGray, fontSize = 12.sp, lineHeight = 17.sp,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("$THRESHOLD_MIN", color = TextGray, fontSize = 11.sp)
+                            Text("$THRESHOLD_MAX", color = TextGray, fontSize = 11.sp)
+                        }
+                        // 通知的條件是「AQI 由下往上跨過門檻」。門檻低於日常空品下限時
+                        // 就不會再有「跨過」這件事，設得越低反而越收不到——與直覺相反，
+                        // 所以要提醒。
+                        if (alertThreshold <= 50) {
+                            Text(
+                                "設太低可能反而收不到通知",
+                                color = AqiOrange, fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        // 個人門檻只能讓自己更早收到：設得比預設高時實際生效的仍是
+                        // 預設值。把這個差異講明，不然使用者會覺得設定沒作用。
+                        if (effectiveThreshold > 0 && alertThreshold > effectiveThreshold) {
+                            Text(
+                                "實際生效：AQI $effectiveThreshold —— 門檻只能設得比預設更敏感，不會讓你更晚收到警示",
+                                color = TextGray, fontSize = 12.sp, lineHeight = 17.sp,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                            )
+                        }
                     }
                 }
 
@@ -269,19 +319,6 @@ fun SettingsScreen() {
                     .apply()
                 showHealthDialog = false
                 scope.launch { snackbarHostState.showSnackbar("✅ 健康檔案已儲存於本機") }
-            }
-        )
-    }
-
-    if (showThresholdDialog) {
-        AlertThresholdDialog(
-            current = alertThreshold,
-            onDismiss = { showThresholdDialog = false },
-            onSelect = { value ->
-                alertThreshold = value
-                notifPrefs.edit().putInt("alert_threshold", value).apply()
-                syncAlertThreshold(if (value < 0) null else value)
-                showThresholdDialog = false
             }
         )
     }
@@ -592,62 +629,20 @@ private fun LocationsDialog(
 
 // ── 輔助 Composable ────────────────────────────────────────────────────────
 
-// 門檻選項。只列比預設更敏感的值——設得比預設高不會有任何效果
-// （後端取 min(個人, 預設)），列出來只會讓人以為自己關掉了警示。
-private val THRESHOLD_OPTIONS = listOf(
-    -1  to ("預設"        to "依你的健康檔案自動調整（有健康狀況者 AQI 101，其他人 151）"),
-    51  to ("AQI 51 以上"  to "空氣一離開「良好」就通知，最敏感"),
-    101 to ("AQI 101 以上" to "達到「對敏感族群不健康」時通知"),
-    151 to ("AQI 151 以上" to "達到「對所有族群不健康」時通知"),
-)
-
-private fun thresholdLabel(value: Int): String =
-    THRESHOLD_OPTIONS.firstOrNull { it.first == value }?.second?.first ?: "AQI $value 以上"
-
-@Composable
-private fun AlertThresholdDialog(
-    current: Int,
-    onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = BgMain,
-        title = { Text("空氣警示門檻", fontWeight = FontWeight.Bold, color = TextDark) },
-        text = {
-            Column {
-                Text(
-                    "AQI 漲過你選的數字時，會立刻收到一次警示；空品持續不好不會重複通知。",
-                    color = TextGray, fontSize = 13.sp, lineHeight = 19.sp,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                THRESHOLD_OPTIONS.forEach { (value, text) ->
-                    val (label, desc) = text
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(value) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = current == value,
-                            onClick = { onSelect(value) },
-                            colors = RadioButtonDefaults.colors(selectedColor = OrangeMain)
-                        )
-                        Column(Modifier.padding(start = 4.dp)) {
-                            Text(label, color = TextDark, fontSize = 15.sp,
-                                 fontWeight = FontWeight.SemiBold)
-                            Text(desc, color = TextGray, fontSize = 12.sp, lineHeight = 17.sp)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("關閉", color = OrangeMain) }
-        }
-    )
+// 門檻可設定的範圍與級距，與後端 token_store 的 THRESHOLD_MIN/MAX 一致。
+// 級距 5 讓滑桿剛好能停在 50/100/150/200/300 這些 AQI 分級界線上。
+private const val THRESHOLD_MIN = 0
+private const val THRESHOLD_MAX = 500
+private const val THRESHOLD_STEP = 5
+/** AQI 數值 → 等級名稱。名稱必須與後端 health_rules 的 level 一致，
+ *  getAqiColor() 是用字串比對決定顏色的。 */
+private fun aqiLevelName(aqi: Int): String = when {
+    aqi <= 50  -> "良好"
+    aqi <= 100 -> "普通"
+    aqi <= 150 -> "對敏感族群不健康"
+    aqi <= 200 -> "對所有族群不健康"
+    aqi <= 300 -> "非常不健康"
+    else       -> "危害"
 }
 
 @Composable
