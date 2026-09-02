@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.airquality.data.AppContainer
 import com.example.airquality.ui.theme.*
 
 data class NavItem(val label: String, val iconRes: Int?, val emoji: String? = null)
@@ -27,7 +28,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         // 取得 FCM Token 並儲存，供後端發送推播使用
-        TokenManager.fetchAndSaveToken(this)
+        AppContainer.fcmToken.refreshToken()
         setContent {
             AirQualityTheme {
                 AppEntry()

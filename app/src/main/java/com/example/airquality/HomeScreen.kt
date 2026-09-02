@@ -20,8 +20,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,9 +37,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,6 +69,8 @@ fun HomeScreen(
     val uiState             by viewModel.uiState.collectAsState()
     val isRaining           by viewModel.isRaining.collectAsState()
     val currentLocationName by viewModel.currentLocationName.collectAsState()
+    val favorites           by viewModel.favorites.collectAsState()
+    val conditions          by viewModel.healthConditions.collectAsState()
     var showLocationDialog  by remember { mutableStateOf(false) }
     // 首頁直接新增常用地點（不必進設定頁）
     var showAddLocationDialog by remember { mutableStateOf(false) }
@@ -86,20 +83,14 @@ fun HomeScreen(
 
     // 權限請求 launcher：權限流程結束後，一律依「持久化的選擇」載入——
     // 手動選過地區就用該地區（與定位權限無關）；GPS 模式才看定位權限，
-    // 無權限由 fetchWithGps 內部退預設位置。避免像過去寫死台北市而蓋掉使用者選擇。
+    // 無權限由 HomeViewModel.switchToGps 內部退預設地區。避免像過去寫死台北市而蓋掉使用者選擇。
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
-        loadInitialLocation(context, viewModel)
+        viewModel.loadInitialLocation()
 
         // 未授權定位、也沒選過任何地區 → 引導使用者必須自行選擇一個常用地點
-        val hasLocation = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        if (!hasLocation && !hasSavedChoice(context)) {
+        if (!viewModel.hasLocationPermission() && !viewModel.hasSavedChoice()) {
             // Toast 於 Android 12+ 僅顯示兩行，文字須精簡避免被截斷
             Toast.makeText(context, "未開啟定位，請選擇常用地點", Toast.LENGTH_LONG).show()
             showLocationDialog = true
@@ -111,15 +102,8 @@ fun HomeScreen(
     val gpsPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
-        val granted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            saveLocationChoice(context, "gps", "", "")
-            viewModel.switchToGps(context)
+        if (viewModel.hasLocationPermission()) {
+            viewModel.switchToGps()
         } else {
             // Toast 於 Android 12+ 僅顯示兩行，文字須精簡避免被截斷
             Toast.makeText(context, "未取得定位權限，請至系統設定開啟", Toast.LENGTH_LONG).show()
@@ -130,10 +114,7 @@ fun HomeScreen(
     // 若全部已授權則直接載入（單一初始載入決策點，避免兩條路互相覆蓋）
     LaunchedEffect(Unit) {
         val perms = mutableListOf<String>()
-        val hasLocation = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!hasLocation) {
+        if (!viewModel.hasLocationPermission()) {
             perms += Manifest.permission.ACCESS_FINE_LOCATION
             perms += Manifest.permission.ACCESS_COARSE_LOCATION
         }
@@ -147,7 +128,7 @@ fun HomeScreen(
         if (perms.isNotEmpty()) {
             permissionLauncher.launch(perms.toTypedArray())   // 載入交由上方回呼處理
         } else {
-            loadInitialLocation(context, viewModel)
+            viewModel.loadInitialLocation()
         }
     }
 
@@ -159,7 +140,7 @@ fun HomeScreen(
     }
 
     // 當 lifecycle 狀態改變（回到前景 ON_RESUME）時更新日期並重新抓取空氣品質資料。
-    // 初次載入由下方 loadInitialLocation 依「持久化的選擇」處理；addObserver 會立即補發
+    // 初次載入由 viewModel.loadInitialLocation() 依「持久化的選擇」處理；addObserver 會立即補發
     // 一次 ON_RESUME，若不跳過會以預設 GPS 模式搶先執行、蓋掉持久化選擇，故跳過第一次。
     var skipFirstResume by remember { mutableStateOf(true) }
     DisposableEffect(lifecycleOwner) {
@@ -168,11 +149,12 @@ fun HomeScreen(
                 currentDateString = getCurrentDateString()
                 if (skipFirstResume) {
                     skipFirstResume = false
-                } else if (viewModel.isGpsMode) {
-                    fetchWithGps(context, viewModel)
                 } else {
-                    viewModel.refreshSavedLocation(context)
+                    viewModel.refreshCurrentLocation()
                 }
+                // 使用者可能剛在設定頁改過健康檔案或常用地點
+                viewModel.reloadHealthProfile()
+                viewModel.reloadFavorites()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -205,12 +187,8 @@ fun HomeScreen(
 
         // ── 地點切換 Dialog ──────────────────────────────────────────────
         if (showLocationDialog) {
-            val prefs = context.getSharedPreferences("health_profile", android.content.Context.MODE_PRIVATE)
-            val count = prefs.getInt("fav_count", 0)
-            val favLocations = (1..count).mapNotNull { i ->
-                val name    = prefs.getString("fav_${i}_name",    "")?.trim() ?: ""
-                val address = prefs.getString("fav_${i}_address", "")?.trim() ?: ""
-                if (name.isNotEmpty() && address.isNotEmpty()) Pair(name, address) else null
+            val favLocations = favorites.filter {
+                it.name.isNotEmpty() && it.address.isNotEmpty()
             }
 
             androidx.compose.material3.AlertDialog(
@@ -244,15 +222,8 @@ fun HomeScreen(
                             selected = currentLocationName == "GPS 定位"
                         ) {
                             showLocationDialog = false
-                            val hasLocation = ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.ACCESS_FINE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED ||
-                                ContextCompat.checkSelfPermission(
-                                    context, Manifest.permission.ACCESS_COARSE_LOCATION
-                                ) == PackageManager.PERMISSION_GRANTED
-                            if (hasLocation) {
-                                saveLocationChoice(context, "gps", "", "")
-                                viewModel.switchToGps(context)
+                            if (viewModel.hasLocationPermission()) {
+                                viewModel.switchToGps()
                             } else {
                                 // 尚未授權定位 → 跳出系統權限詢問（結果由 gpsPermissionLauncher 處理）
                                 gpsPermissionLauncher.launch(arrayOf(
@@ -267,8 +238,7 @@ fun HomeScreen(
                                 selected = currentLocationName == name
                             ) {
                                 showLocationDialog = false
-                                saveLocationChoice(context, "saved", name, address)
-                                viewModel.switchToSavedLocation(context, name, address)
+                                viewModel.switchToSavedLocation(name, address)
                             }
                         }
                         if (favLocations.isEmpty()) {
@@ -315,18 +285,10 @@ fun HomeScreen(
                         val n = addLocName.trim()
                         val a = addLocAddress.trim()
                         if (n.isNotEmpty() && a.isNotEmpty()) {
-                            // 與設定頁共用同一份常用地點儲存（附加到清單尾端）
-                            val prefs = context.getSharedPreferences("health_profile", Context.MODE_PRIVATE)
-                            val count = prefs.getInt("fav_count", 0)
-                            prefs.edit()
-                                .putString("fav_${count + 1}_name", n)
-                                .putString("fav_${count + 1}_address", a)
-                                .putInt("fav_count", count + 1)
-                                .apply()
+                            // 常用地點與設定頁共用同一份儲存（附加到清單尾端）
                             showAddLocationDialog = false
                             showLocationDialog = false
-                            saveLocationChoice(context, "saved", n, a)
-                            viewModel.switchToSavedLocation(context, n, a)
+                            viewModel.addFavoriteAndSwitch(n, a)
                         } else {
                             Toast.makeText(context, "請填寫名稱與地址", Toast.LENGTH_SHORT).show()
                         }
@@ -454,8 +416,6 @@ fun HomeScreen(
 
                     // ── 行動按鈕（依 AQI 等級與健康檔案隨機抽 3 個）────
                     val currentAqiInt = aqiValue.toIntOrNull() ?: 0
-                    val prefs = context.getSharedPreferences("health_profile", android.content.Context.MODE_PRIVATE)
-                    val conditions = (prefs.getString("health_conditions", "") ?: "").split(",")
                     val hasAsthma        = "氣喘" in conditions
                     val hasCardiovascular = "心血管疾病" in conditions
                     val aqiBand = when {
@@ -639,67 +599,6 @@ fun ActionChip(iconRes: Int, label: String, color: Color, modifier: Modifier = M
         Spacer(Modifier.height(12.dp))
         Text(label, color = Color(0xFF666666), fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
     }
-}
-
-// GPS 定位優先，若無法取得則 fallback 預設地址
-@SuppressLint("MissingPermission")
-fun fetchWithGps(context: Context, viewModel: HomeViewModel) {
-    val hasPermission = ContextCompat.checkSelfPermission(
-        context, Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
-        context, Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-
-    if (!hasPermission) {
-        viewModel.fetchAirQuality(context, "台北市")
-        return
-    }
-
-    val fusedClient = LocationServices.getFusedLocationProviderClient(context)
-    val cts = CancellationTokenSource()
-    fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-        .addOnSuccessListener { location ->
-            if (location != null) {
-                viewModel.fetchAirQualityByLocation(context, location, "")
-            } else {
-                viewModel.fetchAirQuality(context, "台北市")
-            }
-        }
-        .addOnFailureListener {
-            viewModel.fetchAirQuality(context, "台北市")
-        }
-}
-
-// ── 地點選擇持久化 ──────────────────────────────────────────────────────────────
-// 記住使用者上次的地點選擇，重開 App 時沿用；只有選「GPS 定位」才會回到自動定位。
-
-private const val LOCATION_PREF = "location_pref"
-
-private fun saveLocationChoice(context: Context, mode: String, name: String, address: String) {
-    context.getSharedPreferences(LOCATION_PREF, Context.MODE_PRIVATE).edit()
-        .putString("location_mode", mode)      // "gps" 或 "saved"
-        .putString("location_name", name)
-        .putString("location_address", address)
-        .apply()
-}
-
-/** 依上次持久化的選擇載入：手動地區則沿用該地區，否則走 GPS 自動定位。 */
-private fun loadInitialLocation(context: Context, viewModel: HomeViewModel) {
-    val lp = context.getSharedPreferences(LOCATION_PREF, Context.MODE_PRIVATE)
-    val mode = lp.getString("location_mode", "gps") ?: "gps"
-    val address = lp.getString("location_address", "") ?: ""
-    if (mode == "saved" && address.isNotBlank()) {
-        viewModel.switchToSavedLocation(context, lp.getString("location_name", "") ?: "", address)
-    } else {
-        fetchWithGps(context, viewModel)
-    }
-}
-
-/** 是否已手動選擇過地區（持久化為 saved 模式且有地址）。 */
-private fun hasSavedChoice(context: Context): Boolean {
-    val lp = context.getSharedPreferences(LOCATION_PREF, Context.MODE_PRIVATE)
-    return lp.getString("location_mode", "gps") == "saved" &&
-        !lp.getString("location_address", "").isNullOrBlank()
 }
 
 // ── 地點選項 ──────────────────────────────────────────────────────────────────

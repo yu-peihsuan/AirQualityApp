@@ -3,6 +3,8 @@ package com.example.airquality
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.airquality.data.AirQualityRepository
+import com.example.airquality.data.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +23,9 @@ sealed class NotificationUiState {
     data class Error(val message: String) : NotificationUiState()
 }
 
-class NotificationViewModel : ViewModel() {
+class NotificationViewModel(
+    private val airQuality: AirQualityRepository = AppContainer.airQuality
+) : ViewModel() {
     private val _uiState = MutableStateFlow<NotificationUiState>(NotificationUiState.Loading)
     val uiState: StateFlow<NotificationUiState> = _uiState.asStateFlow()
 
@@ -31,14 +35,14 @@ class NotificationViewModel : ViewModel() {
             try {
                 val regionParam = county?.ifBlank { null }
 
-                val newsResponse       = RetrofitClient.apiService.getNews(regionParam)
-                val reportsResponse    = RetrofitClient.apiService.getUserReports(regionParam)
-                val aqiResponse        = RetrofitClient.apiService.getAirQuality(regionParam)
+                val newsResponse       = airQuality.news(regionParam)
+                val reportsResponse    = airQuality.userReports(regionParam)
+                val aqiResponse        = airQuality.airQuality(regionParam)
                 val fireAlertsResponse = try {
-                    RetrofitClient.apiService.getFireAlerts(regionParam)
+                    airQuality.fireAlerts(regionParam)
                 } catch (e: Exception) { null }
                 val forecastResponse   = try {
-                    RetrofitClient.apiService.getForecast(regionParam)
+                    airQuality.forecast(regionParam)
                 } catch (e: Exception) { null }
 
                 // ── 火災警示 ──────────────────────────────────────────────────

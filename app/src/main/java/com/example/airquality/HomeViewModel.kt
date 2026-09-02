@@ -1,21 +1,26 @@
 package com.example.airquality
 
-import android.content.Context
-import android.location.Location
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.*
+import com.example.airquality.data.AirQualityRepository
+import com.example.airquality.data.AppContainer
+import com.example.airquality.data.Coordinates
+import com.example.airquality.data.FavoriteLocation
+import com.example.airquality.data.FcmTokenRepository
+import com.example.airquality.data.GeocodingRepository
+import com.example.airquality.data.HealthProfileRepository
+import com.example.airquality.data.LocationChoice
+import com.example.airquality.data.LocationPreferenceRepository
+import com.example.airquality.data.LocationRepository
+import com.example.airquality.data.LocationResult
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-import kotlin.math.*
+import kotlinx.coroutines.launch
 
 sealed class AqiUiState {
     object Loading : AqiUiState()
@@ -44,7 +49,21 @@ object AppLocationState {
     fun resetToGps() { _selectedLatLng.value = null }
 }
 
-class HomeViewModel : ViewModel() {
+/**
+ * 首頁與 AI 顧問頁共用的 ViewModel。
+ *
+ * 所有 Context 相依（SharedPreferences、定位、網路）都收在 Repository 後面，
+ * 這裡不再接收任何 Context 參數——ViewModel 的生命週期比 Activity 長，
+ * 存下 Activity 的 Context 會讓整個畫面在旋轉或返回後仍無法被回收。
+ */
+class HomeViewModel(
+    private val airQuality: AirQualityRepository = AppContainer.airQuality,
+    private val geocoding: GeocodingRepository = AppContainer.geocoding,
+    private val location: LocationRepository = AppContainer.location,
+    private val healthProfile: HealthProfileRepository = AppContainer.healthProfile,
+    private val fcmToken: FcmTokenRepository = AppContainer.fcmToken,
+    private val locationPreference: LocationPreferenceRepository = AppContainer.locationPreference
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AqiUiState>(AqiUiState.Loading)
     val uiState: StateFlow<AqiUiState> = _uiState.asStateFlow()
@@ -55,8 +74,16 @@ class HomeViewModel : ViewModel() {
     private val _isRaining = MutableStateFlow(false)
     val isRaining: StateFlow<Boolean> = _isRaining.asStateFlow()
 
-    private val _currentLocationName = MutableStateFlow("GPS 定位")
+    private val _currentLocationName = MutableStateFlow(GPS_MODE_NAME)
     val currentLocationName: StateFlow<String> = _currentLocationName.asStateFlow()
+
+    // 常用地點清單，供「切換地點」對話框顯示（畫面不再自己讀 SharedPreferences）
+    private val _favorites = MutableStateFlow(locationPreference.favorites())
+    val favorites: StateFlow<List<FavoriteLocation>> = _favorites.asStateFlow()
+
+    // 健康狀況（首頁的行動建議依此挑選），畫面不再自己讀 SharedPreferences
+    private val _healthConditions = MutableStateFlow(healthProfile.conditions)
+    val healthConditions: StateFlow<List<String>> = _healthConditions.asStateFlow()
 
     // 一次性使用者提示（如地址搜尋失敗），由 HomeScreen 收集後以 Toast 顯示
     private val _userMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
@@ -68,241 +95,206 @@ class HomeViewModel : ViewModel() {
     private val _estimateInfo = MutableStateFlow<EstimateResponse?>(null)
     val estimateInfo: StateFlow<EstimateResponse?> = _estimateInfo.asStateFlow()
 
-    @Suppress("unused")
-    private fun refreshEstimate(lat: Double, lng: Double) {
+    // 記憶體快取：最後一次成功的 AQI 狀態，供 API 失敗時備援
+    private var lastSuccessState: AqiUiState.Success? = null
+
+    // 記住手動選的地點，供 ON_RESUME 刷新時使用
+    private var savedLocationName: String = ""
+    private var savedLocationAddress: String = ""
+
+    // 目前定位點座標（供下風處判斷使用）
+    private var userCoordinates: Coordinates? = null
+
+    val isGpsMode: Boolean
+        get() = _currentLocationName.value == GPS_MODE_NAME
+
+    /** 是否已授權定位。畫面據此決定要不要跳出系統權限詢問。 */
+    fun hasLocationPermission(): Boolean = location.hasPermission()
+
+    /** 是否曾經手動選過一個地區。 */
+    fun hasSavedChoice(): Boolean = locationPreference.hasSavedChoice()
+
+    // ── 地點載入 ──────────────────────────────────────────────────────────
+
+    /** 依上次持久化的選擇載入：手動地區則沿用該地區，否則走 GPS 自動定位。 */
+    fun loadInitialLocation() {
+        when (val choice = locationPreference.currentChoice()) {
+            is LocationChoice.Saved -> switchToSavedLocation(choice.name, choice.address, persist = false)
+            is LocationChoice.Gps   -> switchToGps(persist = false)
+        }
+    }
+
+    /** 回到前景時重新整理目前選定的地點。 */
+    fun refreshCurrentLocation() {
+        if (isGpsMode) switchToGps(persist = false)
+        else if (savedLocationAddress.isNotEmpty()) {
+            switchToSavedLocation(savedLocationName, savedLocationAddress, persist = false)
+        }
+    }
+
+    fun switchToGps(persist: Boolean = true) {
+        _currentLocationName.value = GPS_MODE_NAME
+        AppLocationState.resetToGps()
+        if (persist) locationPreference.saveChoice(LocationChoice.Gps)
         viewModelScope.launch {
-            _estimateInfo.value = try {
-                RetrofitClient.apiService.getAqiEstimate(lat, lng)
-            } catch (e: Exception) {
-                Log.w("HomeViewModel", "插值估計取得失敗: ${e.localizedMessage}")
-                null
+            when (val result = location.currentLocation(highAccuracy = true)) {
+                is LocationResult.Available -> loadByCoordinates(result.coordinates)
+                // 未授權或這次抓不到座標：仍要有資料可看，退回預設地區
+                LocationResult.PermissionDenied,
+                LocationResult.Unavailable -> loadDefaultRegion()
             }
         }
     }
 
-    // 記憶體快取：最後一次成功的 AQI 狀態，供 API 失敗時備援
-    private var _lastSuccessState: AqiUiState.Success? = null
-
-    // 記住手動選的地點，供 ON_RESUME 刷新時使用
-    private var _savedLocationName: String = ""
-    private var _savedLocationAddress: String = ""
-
-    val isGpsMode: Boolean
-        get() = _currentLocationName.value == "GPS 定位"
-
-    fun refreshSavedLocation(context: Context) {
-        if (_savedLocationAddress.isNotEmpty()) {
-            switchToSavedLocation(context, _savedLocationName, _savedLocationAddress)
-        }
-    }
-
-    fun switchToSavedLocation(context: Context, name: String, address: String) {
-        _savedLocationName = name
-        _savedLocationAddress = address
+    fun switchToSavedLocation(name: String, address: String, persist: Boolean = true) {
+        savedLocationName = name
+        savedLocationAddress = address
         _currentLocationName.value = name   // 同步設定，讓 isGpsMode 立即反映手動選擇
+        if (persist) locationPreference.saveChoice(LocationChoice.Saved(name, address))
         viewModelScope.launch {
             _uiState.value = AqiUiState.Loading
             try {
-                val coords = googleForwardGeocode(address)
+                val coords = geocoding.forwardGeocode(address)
                 if (coords == null) {
                     _userMessage.tryEmit("找不到「$name」的位置（地址搜尋暫時無法使用），暫以台北市資料顯示")
                 }
-                // 預設位置：台北市中心（北緯 25°05'14"、東經 121°33'20"）
-                val lat = coords?.first ?: 25.087222
-                val lng = coords?.second ?: 121.555556
-                val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
-                val aqiRecords  = aqiResponse.records ?: emptyList()
-                if (aqiRecords.isEmpty()) throw Exception("沒有取得 AQI 資料")
-                val nearestAqi = findNearestStation(aqiRecords, lat, lng)
-                val isCache = aqiResponse.status == "cached"
-                val successState = AqiUiState.Success(aqiResponse, nearestAqi, address, isCache)
-                _lastSuccessState = successState
-                _uiState.value = successState
-                _userLat = lat
-                _userLng = lng
-                AppLocationState.update(lat, lng)
+                val resolved = coords ?: DEFAULT_COORDINATES
+                val nearest = loadAqi(resolved, displayRegion = address)
+                userCoordinates = resolved
+                AppLocationState.update(resolved.lat, resolved.lng)
                 // 手動切換地區也更新 FCM Token 的縣市與座標，
                 // 讓推播（每日摘要、警報、附近回報）依「當下選擇的地區」發送，
                 // 不需定位權限也能收到所選地區的通知
-                TokenManager.uploadTokenWithCounty(context, nearestAqi.county, lat, lng)
-                try {
-                    val weather = RetrofitClient.apiService.getWeather(
-                        county = nearestAqi.county,
-                        lat    = lat,
-                        lng    = lng
-                    )
-                    _isRaining.value = weather.isRaining
-                } catch (e: Exception) { _isRaining.value = false }
+                fcmToken.uploadRegistration(nearest.county, resolved)
+                refreshWeather(nearest.county, resolved)
             } catch (e: Exception) {
-                val cached = _lastSuccessState
-                if (cached != null) {
-                    Log.w("HomeViewModel", "switchToSavedLocation 失敗，使用快取: ${e.localizedMessage}")
-                    _uiState.value = cached.copy(isFromCache = true)
-                } else {
-                    _uiState.value = AqiUiState.Error("地點切換失敗: ${e.localizedMessage}")
-                }
+                fallbackToCache("switchToSavedLocation 失敗", e, "地點切換失敗")
             }
         }
     }
 
-    fun switchToGps(context: android.content.Context) {
-        _currentLocationName.value = "GPS 定位"
-        AppLocationState.resetToGps()
-        fetchWithGps(context, this)
+    /** 新增一個常用地點並立即切換過去。 */
+    fun addFavoriteAndSwitch(name: String, address: String) {
+        locationPreference.addFavorite(FavoriteLocation(name, address))
+        _favorites.value = locationPreference.favorites()
+        switchToSavedLocation(name, address)
     }
 
-    // GPS 座標（由 fetchAirQualityByLocation 設定，供下風處判斷使用）
-    private var _userLat: Double? = null
-    private var _userLng: Double? = null
+    /** 重新從本機載入常用地點清單（設定頁改過之後呼叫）。 */
+    fun reloadFavorites() {
+        _favorites.value = locationPreference.favorites()
+    }
 
-    fun fetchAirQuality(context: Context?, address: String) {
-        viewModelScope.launch {
-            _uiState.value = AqiUiState.Loading
-            try {
-                val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
-                val aqiRecords = aqiResponse.records ?: emptyList()
-                if (aqiRecords.isEmpty()) throw Exception("沒有取得 AQI 資料")
+    /** 重新從本機載入健康狀況（設定頁改過之後呼叫）。 */
+    fun reloadHealthProfile() {
+        _healthConditions.value = healthProfile.conditions
+    }
 
-                val (lat, lng, displayRegion) = getCoordinates(context, address)
-                val nearestAqi = findNearestStation(aqiRecords, lat, lng)
-                val isCache = aqiResponse.status == "cached"
-                val successState = AqiUiState.Success(aqiResponse, nearestAqi, displayRegion, isCache)
-                _lastSuccessState = successState
-                _uiState.value = successState
+    // ── 內部載入流程 ──────────────────────────────────────────────────────
 
-            } catch (e: Exception) {
-                Log.e("HomeViewModel", "fetchAirQuality failed", e)
-                val cached = _lastSuccessState
-                if (cached != null) {
-                    Log.w("HomeViewModel", "使用 AQI 快取資料")
-                    _uiState.value = cached.copy(isFromCache = true)
-                } else {
-                    _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
-                }
-            }
+    /** GPS 取得座標後：反查縣市 → 抓 AQI → 上傳推播註冊 → 抓天氣。 */
+    private suspend fun loadByCoordinates(coords: Coordinates) {
+        _uiState.value = AqiUiState.Loading
+        try {
+            val region = geocoding.reverseGeocodeCounty(coords.lat, coords.lng) ?: "目前位置"
+            val nearest = loadAqi(coords, displayRegion = region)
+            userCoordinates = coords
+            fcmToken.uploadRegistration(nearest.county, coords)
+            refreshWeather(nearest.county, coords)
+        } catch (e: Exception) {
+            fallbackToCache("GPS 定位載入失敗", e, "AQI 取得失敗")
         }
     }
 
-    fun fetchAirQualityByLocation(context: Context, location: Location, fallbackAddress: String) {
-        viewModelScope.launch {
-            _uiState.value = AqiUiState.Loading
-            try {
-                // 使用 Google Maps Geocoding API 反向地理編碼，取得縣市名
-                val region = googleReverseGeocodeCounty(location.latitude, location.longitude)
-                    ?: fallbackAddress.take(6).ifBlank { "目前位置" }
-
-                val aqiResponse = RetrofitClient.apiService.getAirQuality(null)
-                val aqiRecords = aqiResponse.records ?: emptyList()
-                if (aqiRecords.isEmpty()) throw Exception("沒有取得 AQI 資料")
-
-                val nearestAqi = findNearestStation(aqiRecords, location.latitude, location.longitude)
-                val isCache = aqiResponse.status == "cached"
-                val successState = AqiUiState.Success(aqiResponse, nearestAqi, region, isCache)
-                _lastSuccessState = successState
-                _uiState.value = successState
-                _userLat = location.latitude
-                _userLng = location.longitude
-                // GPS 縣市確認後，上傳 FCM Token（含座標與健康狀況）給後端
-                TokenManager.uploadTokenWithCounty(context, nearestAqi.county, location.latitude, location.longitude)
-                // 抓即時天氣（判斷是否下雨，供首頁圖示使用）
-                try {
-                    val weather = RetrofitClient.apiService.getWeather(
-                        county = nearestAqi.county,
-                        lat    = location.latitude,
-                        lng    = location.longitude
-                    )
-                    _isRaining.value = weather.isRaining
-                } catch (e: Exception) {
-                    _isRaining.value = false
-                }
-
-            } catch (e: Exception) {
-                Log.e("HomeViewModel", "fetchAirQualityByLocation failed", e)
-                val cached = _lastSuccessState
-                if (cached != null) {
-                    Log.w("HomeViewModel", "使用 AQI 快取資料（GPS 定位失敗）")
-                    _uiState.value = cached.copy(isFromCache = true)
-                } else {
-                    _uiState.value = AqiUiState.Error("AQI 取得失敗: ${e.localizedMessage}")
-                }
-            }
+    /** 沒有定位也沒有選過地區時的備援：以台北市顯示。 */
+    private suspend fun loadDefaultRegion() {
+        _uiState.value = AqiUiState.Loading
+        try {
+            loadAqi(DEFAULT_COORDINATES, displayRegion = DEFAULT_REGION)
+        } catch (e: Exception) {
+            fallbackToCache("預設地區載入失敗", e, "AQI 取得失敗")
         }
     }
 
-    fun fetchRagAdvice(context: Context) {
+    /** 抓全台測站、挑最近一站並更新畫面狀態；回傳選中的測站。 */
+    private suspend fun loadAqi(coords: Coordinates, displayRegion: String): AqiRecord {
+        val response = airQuality.airQuality()
+        val nearest = airQuality.nearestStation(response.records, coords.lat, coords.lng)
+            ?: throw IllegalStateException("沒有取得 AQI 資料")
+        val successState = AqiUiState.Success(
+            data = response,
+            nearestRecord = nearest,
+            displayRegion = displayRegion,
+            isFromCache = response.status == "cached"
+        )
+        lastSuccessState = successState
+        _uiState.value = successState
+        return nearest
+    }
+
+    /** 天氣只影響首頁圖示，抓不到就當作沒下雨，不影響主要流程。 */
+    private suspend fun refreshWeather(county: String, coords: Coordinates) {
+        _isRaining.value = try {
+            airQuality.weather(county, coords.lat, coords.lng).isRaining
+        } catch (e: Exception) {
+            Log.w(TAG, "天氣取得失敗：${e.localizedMessage}")
+            false
+        }
+    }
+
+    private fun fallbackToCache(logMessage: String, cause: Exception, userFacing: String) {
+        val cached = lastSuccessState
+        if (cached != null) {
+            Log.w(TAG, "$logMessage，改用快取資料：${cause.localizedMessage}")
+            _uiState.value = cached.copy(isFromCache = true)
+        } else {
+            Log.e(TAG, logMessage, cause)
+            _uiState.value = AqiUiState.Error("$userFacing: ${cause.localizedMessage}")
+        }
+    }
+
+    // ── AI 建議 ───────────────────────────────────────────────────────────
+
+    fun fetchRagAdvice() {
         viewModelScope.launch {
             _ragAdviceState.value = RagAdviceUiState.Loading
-
             try {
-                // 1. 從 SharedPreferences 讀取健康檔案
-                val healthPrefs = context.getSharedPreferences("health_profile", Context.MODE_PRIVATE)
-                val ageGroupRaw   = healthPrefs.getString("health_age_group", "18-64歲") ?: "18-64歲"
-                val conditionsRaw = healthPrefs.getString("health_conditions", "") ?: ""
-                val conditions    = conditionsRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                // 健康屬性僅在使用者主動使用 AI 建議時送出（見隱私權政策第二節）
+                val userProfile = healthProfile.toRagUserProfile()
 
-                val ageGroup = when {
-                    ageGroupRaw.contains("18歲以下") -> "child"
-                    ageGroupRaw.contains("65")    -> "elderly"
-                    else                          -> "adult"
-                }
-
-                val otherNotes = healthPrefs.getString("health_other", "")?.ifBlank { null }
-
-                val userProfile = RagUserProfile(
-                    ageGroup          = ageGroup,
-                    isPregnant        = conditions.contains("懷孕中"),
-                    hasAsthma         = conditions.contains("氣喘") || conditions.contains("呼吸道疾病"),
-                    hasCardiovascular = conditions.contains("心血管疾病") || conditions.contains("高血壓"),
-                    hasAllergy        = conditions.contains("過敏"),
-                    otherNotes        = otherNotes
-                )
-
-                // 2. 取得所在縣市與 AQI（從 AQI 成功狀態取最近測站，避免重複呼叫 API）
-                val county: String
-                val knownAqi: Int?
-                val knownPm25: Double?
-                when (val aqiState = _uiState.value) {
-                    is AqiUiState.Success -> {
-                        county    = aqiState.nearestRecord.county.ifBlank { "台北市" }
-                        knownAqi  = aqiState.nearestRecord.aqi.toIntOrNull()
-                        knownPm25 = aqiState.nearestRecord.pm25.toDoubleOrNull()
-                    }
-                    else -> {
-                        county    = "台北市"
-                        knownAqi  = null
-                        knownPm25 = null
-                    }
-                }
-
-                // 3. 呼叫 RAG API（附上 GPS 座標供下風處判斷）
+                // 所在縣市與 AQI 直接取自目前的成功狀態，避免重複呼叫 API
+                val success = _uiState.value as? AqiUiState.Success
                 val request = RagAdviceRequest(
-                    county      = county,
-                    latitude    = _userLat,
-                    longitude   = _userLng,
-                    aqi         = knownAqi,
-                    pm25        = knownPm25,
+                    county = success?.nearestRecord?.county?.ifBlank { DEFAULT_REGION } ?: DEFAULT_REGION,
+                    latitude = userCoordinates?.lat,
+                    longitude = userCoordinates?.lng,
+                    aqi = success?.nearestRecord?.aqi?.toIntOrNull(),
+                    pm25 = success?.nearestRecord?.pm25?.toDoubleOrNull(),
                     userProfile = userProfile
                 )
-                val response = RetrofitClient.apiService.getRagAdvice(request)
-                _ragAdviceState.value = RagAdviceUiState.Success(response)
-
+                _ragAdviceState.value = RagAdviceUiState.Success(airQuality.ragAdvice(request))
             } catch (e: Exception) {
-                Log.e("HomeViewModel", "fetchRagAdvice failed", e)
+                Log.e(TAG, "fetchRagAdvice failed", e)
                 _ragAdviceState.value = RagAdviceUiState.Error("AI 建議取得失敗: ${e.localizedMessage}")
             }
         }
     }
 
-    // 找最近測站
-    private fun <T> findNearestStation(records: List<T>, lat: Double, lng: Double): T {
-        return records.minByOrNull {
-            val rLat = if (it is AqiRecord) it.latitude.toDoubleOrNull() ?: 0.0 else 0.0
-            val rLng = if (it is AqiRecord) it.longitude.toDoubleOrNull() ?: 0.0 else 0.0
-            haversine(lat, lng, rLat, rLng)
-        } ?: records.first()
+    @Suppress("unused")
+    private fun refreshEstimate(coords: Coordinates) {
+        viewModelScope.launch {
+            _estimateInfo.value = try {
+                airQuality.aqiEstimate(coords.lat, coords.lng)
+            } catch (e: Exception) {
+                Log.w(TAG, "插值估計取得失敗: ${e.localizedMessage}")
+                null
+            }
+        }
     }
 
-    // 中文 8 方位風向
+    // ── 顯示用工具 ────────────────────────────────────────────────────────
+
+    /** 中文 8 方位風向。 */
     fun getWindDirectionString(degreesStr: String, speedStr: String): String {
         val speed = speedStr.toFloatOrNull() ?: 0f
         if (speed < 0.3f) return "無風"
@@ -318,87 +310,11 @@ class HomeViewModel : ViewModel() {
         return directions[index]
     }
 
-    // 計算兩點距離
-    private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val R = 6371.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2).pow(2.0) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2.0)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return R * c
+    private companion object {
+        const val TAG = "HomeViewModel"
+        const val GPS_MODE_NAME = "GPS 定位"
+        const val DEFAULT_REGION = "台北市"
+        // 預設位置：台北市中心（北緯 25°05'14"、東經 121°33'20"）
+        val DEFAULT_COORDINATES = Coordinates(25.087222, 121.555556)
     }
-
-    // 統一取得經緯度（正向地理編碼：地址 → 座標）
-    // 預設位置：台北市中心（北緯 25°05'14"、東經 121°33'20"）
-    private suspend fun getCoordinates(context: Context?, address: String): Triple<Double, Double, String> {
-        var lat = 25.087222
-        var lng = 121.555556
-        var region = "台北市"
-
-        if (address.isNotBlank()) {
-            val result = googleForwardGeocode(address)
-            if (result != null) {
-                lat = result.first
-                lng = result.second
-                region = address.take(6)
-            } else if (address != "台北市") {
-                // 預設 fallback 地址本來就是台北市，查不到才需要提示使用者
-                _userMessage.tryEmit("找不到「$address」的位置（地址搜尋暫時無法使用），暫以台北市資料顯示")
-            }
-        }
-        return Triple(lat, lng, region)
-    }
-
-    // Google Maps Geocoding API：正向地理編碼（地址 → 座標）
-    private suspend fun googleForwardGeocode(address: String): Pair<Double, Double>? =
-        withContext(Dispatchers.IO) {
-            try {
-                val encoded = java.net.URLEncoder.encode(address, "UTF-8")
-                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?address=$encoded&key=${BuildConfig.GEOCODING_API_KEY}&language=zh-TW")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "GET"
-                if (conn.responseCode == 200) {
-                    val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-                    if (json.getString("status") == "OK") {
-                        val location = json.getJSONArray("results")
-                            .getJSONObject(0)
-                            .getJSONObject("geometry")
-                            .getJSONObject("location")
-                        return@withContext Pair(location.getDouble("lat"), location.getDouble("lng"))
-                    }
-                }
-            } catch (e: Exception) { Log.e("GoogleGeocoder", e.message ?: "") }
-            null
-        }
-
-    // Google Maps Geocoding API：反向地理編碼（座標 → 縣市名）
-    private suspend fun googleReverseGeocodeCounty(lat: Double, lng: Double): String? =
-        withContext(Dispatchers.IO) {
-            try {
-                val url = URL("https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=${BuildConfig.GEOCODING_API_KEY}&language=zh-TW")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "GET"
-                if (conn.responseCode == 200) {
-                    val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-                    if (json.getString("status") == "OK") {
-                        val components = json.getJSONArray("results")
-                            .getJSONObject(0)
-                            .getJSONArray("address_components")
-                        var adminArea = ""
-                        var subAdminArea = ""
-                        for (i in 0 until components.length()) {
-                            val comp = components.getJSONObject(i)
-                            val types = comp.getJSONArray("types")
-                            val typeList = (0 until types.length()).map { types.getString(it) }
-                            when {
-                                "administrative_area_level_1" in typeList -> adminArea = comp.getString("long_name")
-                                "administrative_area_level_2" in typeList -> subAdminArea = comp.getString("long_name")
-                            }
-                        }
-                        return@withContext (adminArea + subAdminArea).ifBlank { null }
-                    }
-                }
-            } catch (e: Exception) { Log.e("GoogleGeocoder", e.message ?: "") }
-            null
-        }
-}
+}

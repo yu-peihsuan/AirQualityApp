@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,8 +31,6 @@ data class ChatMessage(
 fun AiHealthScreen(
     homeViewModel: HomeViewModel = viewModel()
 ) {
-    val context = LocalContext.current
-
     // 觀測 AQI 狀態（用來觸發 RAG 建議）
     val aqiState by homeViewModel.uiState.collectAsState()
 
@@ -43,7 +40,7 @@ fun AiHealthScreen(
     // 進入畫面時自動觸發 RAG 建議
     LaunchedEffect(aqiState) {
         if (aqiState is AqiUiState.Success) {
-            homeViewModel.fetchRagAdvice(context)
+            homeViewModel.fetchRagAdvice()
         }
     }
 
@@ -145,7 +142,7 @@ fun AiHealthScreen(
 
             // ── 重新取得建議按鈕 ──────────────────────────────────────────
             OutlinedButton(
-                onClick = { homeViewModel.fetchRagAdvice(context) },
+                onClick = { homeViewModel.fetchRagAdvice() },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
                 enabled = ragAdviceState !is RagAdviceUiState.Loading
