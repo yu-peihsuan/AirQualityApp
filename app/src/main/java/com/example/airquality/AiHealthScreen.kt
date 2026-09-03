@@ -1,6 +1,9 @@
 package com.example.airquality
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -316,6 +321,7 @@ fun DownwindWarningCard(typeLabel: String, distText: String, windDir: String) {
  */
 @Composable
 private fun AiSharingDisclosureCard(onAgree: () -> Unit) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -344,6 +350,16 @@ private fun AiSharingDisclosureCard(onAgree: () -> Unit) {
             fontSize = 13.sp,
             lineHeight = 20.sp,
             color = Color(0xFF888888)
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "隱私權政策",
+            fontSize = 13.sp,
+            color = OrangeMain,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL)))
+            }
         )
         Spacer(Modifier.height(14.dp))
         Button(
