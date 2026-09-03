@@ -143,10 +143,18 @@ class SettingsViewModel(
         _ageGroup.value = ageGroup
         _conditions.value = conditions
         _otherNotes.value = otherNotes
-        _message.tryEmit("✅ 健康檔案已儲存於本機")
-        // 已同意分眾推播的使用者，改完健康檔案要讓伺服器那份跟著更新
-        if (_sensitiveAlertsEnabled.value) {
-            viewModelScope.launch { fcmToken.uploadRegistration() }
+        // 已同意分眾推播的使用者，改完健康檔案要讓伺服器那份跟著更新；
+        // 同步失敗要講出來，否則使用者會以為警示分眾已經跟著改了
+        if (!_sensitiveAlertsEnabled.value) {
+            _message.tryEmit("✅ 健康檔案已儲存於本機")
+            return
+        }
+        viewModelScope.launch {
+            when (val result = fcmToken.uploadRegistration()) {
+                is SyncResult.Success -> _message.tryEmit("✅ 健康檔案已儲存，警示分眾已同步更新")
+                is SyncResult.Failure ->
+                    _message.tryEmit("✅ 健康檔案已存於本機，但警示分眾未能同步：${result.message}")
+            }
         }
     }
 
