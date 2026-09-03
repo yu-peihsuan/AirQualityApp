@@ -1,7 +1,6 @@
 package com.example.airquality
 
 import android.Manifest
-import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -13,7 +12,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,8 +24,6 @@ import kotlinx.coroutines.launch
 fun ReportScreen(
     reportViewModel: ReportViewModel = viewModel()
 ) {
-    val context = LocalContext.current
-
     var location    by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var expanded    by remember { mutableStateOf(false) }
@@ -39,27 +35,22 @@ fun ReportScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = coroutineScope()
 
-    // 定位權限請求：允許後自動抓取 GPS 位置
+    // 定位權限請求：允許後自動抓取 GPS 位置；拒絕則提示改為手動輸入
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) reportViewModel.fetchAddressFromGps(context)
+        if (granted) reportViewModel.fetchAddressFromGps()
+        else scope.launch { snackbarHostState.showSnackbar("未取得定位權限，請手動輸入地點") }
     }
 
-    // 進入畫面時：若有手動選擇地點則用該座標填入，否則用 GPS
+    // 進入畫面時：若有手動選擇地點則用該座標填入，否則用 GPS。
+    // 權限判斷交給 ViewModel／LocationRepository，未授權會回 PermissionRequired。
     LaunchedEffect(Unit) {
         val selectedCoords = AppLocationState.selectedLatLng.value
         if (selectedCoords != null) {
             reportViewModel.fetchAddressFromCoords(selectedCoords.first, selectedCoords.second)
         } else {
-            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-                context, Manifest.permission.ACCESS_FINE_LOCATION
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (hasPermission) {
-                reportViewModel.fetchAddressFromGps(context)
-            } else {
-                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
+            reportViewModel.fetchAddressFromGps()
         }
     }
 
@@ -74,6 +65,10 @@ fun ReportScreen(
                 scope.launch { snackbarHostState.showSnackbar(state.message) }
                 reportViewModel.resetLocationFetchState()
             }
+            LocationFetchState.PermissionRequired -> {
+                reportViewModel.resetLocationFetchState()
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
             else -> {}
         }
     }
@@ -83,7 +78,7 @@ fun ReportScreen(
         when (val state = uiState) {
             is ReportUiState.Success -> {
                 scope.launch { snackbarHostState.showSnackbar(state.message) }
-                reportViewModel.fetchAddressFromGps(context)
+                reportViewModel.fetchAddressFromGps()
                 description = ""
                 category = ""
                 reportViewModel.resetState()
@@ -142,7 +137,7 @@ fun ReportScreen(
                     )
                     val isFetchingLocation = locationFetchState is LocationFetchState.Loading
                     OutlinedButton(
-                        onClick = { reportViewModel.fetchAddressFromGps(context) },
+                        onClick = { reportViewModel.fetchAddressFromGps() },
                         enabled = !isFetchingLocation,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.height(56.dp),
@@ -217,7 +212,7 @@ fun ReportScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = {
-                            reportViewModel.fetchAddressFromGps(context)
+                            reportViewModel.fetchAddressFromGps()
                             description = ""
                             category = ""
                         },

@@ -46,7 +46,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // 開啟 R8：移除未使用的程式碼、混淆，並依 proguard-rules.pro
+            // 把 release 版的 Log.v／Log.d 一併去掉
+            isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

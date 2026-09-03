@@ -1,7 +1,5 @@
 package com.example.airquality
 
-import android.annotation.SuppressLint
-import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,27 +13,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
+import com.example.airquality.data.AirQualityRepository
+import com.example.airquality.data.AppContainer
+import com.example.airquality.data.Coordinates
+import com.example.airquality.data.LocationRepository
+import com.example.airquality.data.LocationResult
+import com.example.airquality.data.haversineKm
 import com.example.airquality.ui.theme.*
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -46,7 +44,9 @@ sealed class MapUiState {
         val hotspots: List<HotspotRecord>,
         val reports: List<NewsRecord>,
         val fireAlerts: List<NewsRecord>,
-        val userLocation: LatLng?
+        val userLocation: LatLng?,
+        /** 地圖資料抓到了，但因為沒有定位權限而無法標出使用者位置。 */
+        val locationPermissionDenied: Boolean = false
     ) : MapUiState()
     data class Error(val message: String) : MapUiState()
 }
@@ -54,25 +54,29 @@ sealed class MapUiState {
 // 保留舊名稱的 typealias，避免其他地方有引用
 typealias HotspotUiState = MapUiState
 
-class MapViewModel : ViewModel() {
+class MapViewModel(
+    private val airQuality: AirQualityRepository = AppContainer.airQuality,
+    private val location: LocationRepository = AppContainer.location
+) : ViewModel() {
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
-    @SuppressLint("MissingPermission")
-    fun fetchMapData(context: Context) {
+    fun fetchMapData() {
         viewModelScope.launch {
             _uiState.value = MapUiState.Loading
             try {
-                val hotspotsDeferred    = async { RetrofitClient.apiService.getHotspots() }
-                val reportsDeferred     = async { RetrofitClient.apiService.getUserReports() }
+                val hotspotsDeferred    = async { airQuality.hotspots() }
+                val reportsDeferred     = async { airQuality.userReports() }
                 val fireAlertsDeferred  = async {
-                    try { RetrofitClient.apiService.getFireAlerts() } catch (e: Exception) { null }
+                    try { airQuality.fireAlerts() } catch (e: Exception) { null }
                 }
-                // 若使用者已手動選擇地點，直接使用該座標；否則取 GPS
-                val locationDeferred    = async {
+                // 若使用者已手動選擇地點，直接使用該座標；否則取 GPS。
+                // 定位失敗（含未授權）不該讓整張地圖變成錯誤畫面——熱點與回報
+                // 是公開資料，沒有定位一樣看得到，只是不標出「你在這裡」。
+                val locationDeferred = async {
                     AppLocationState.selectedLatLng.value
-                        ?.let { (lat, lng) -> LatLng(lat, lng) }
-                        ?: getCurrentLocation(context)
+                        ?.let { (lat, lng) -> LocationResult.Available(Coordinates(lat, lng)) }
+                        ?: location.currentLocation()
                 }
 
                 val hotspots     = hotspotsDeferred.await().hotspots
@@ -82,12 +86,20 @@ class MapViewModel : ViewModel() {
                 val fireAlerts   = (fireAlertsDeferred.await()?.records ?: emptyList()).filter {
                     it.latitude != null && it.longitude != null
                 }
-                val userLocation = locationDeferred.await()
+                val locationResult = locationDeferred.await()
+                val userLocation = (locationResult as? LocationResult.Available)
+                    ?.coordinates?.let { LatLng(it.lat, it.lng) }
 
                 // 去重：同縣市 + 火災類型 + 時間差 ≤ 2 小時的回報，以消防署警示為準
                 val dedupedReports = deduplicateWithFireAlerts(fireAlerts, reports)
 
-                _uiState.value = MapUiState.Success(hotspots, dedupedReports, fireAlerts, userLocation)
+                _uiState.value = MapUiState.Success(
+                    hotspots = hotspots,
+                    reports = dedupedReports,
+                    fireAlerts = fireAlerts,
+                    userLocation = userLocation,
+                    locationPermissionDenied = locationResult is LocationResult.PermissionDenied
+                )
             } catch (e: Exception) {
                 Log.e("MapViewModel", "fetchMapData failed", e)
                 _uiState.value = MapUiState.Error("地圖資料取得失敗")
@@ -110,17 +122,6 @@ class MapViewModel : ViewModel() {
                 .apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Taipei") }
                 .parse(normalized)?.time
         } catch (e: Exception) { null }
-    }
-
-    private fun haversineKm(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val R = 6371.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        val sinDLat = Math.sin(dLat / 2)
-        val sinDLng = Math.sin(dLng / 2)
-        val a = sinDLat * sinDLat +
-            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * sinDLng * sinDLng
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     }
 
     /**
@@ -148,19 +149,6 @@ class MapViewModel : ViewModel() {
             }
         }
     }
-
-    @SuppressLint("MissingPermission")
-    private suspend fun getCurrentLocation(context: Context): LatLng? =
-        suspendCancellableCoroutine { cont ->
-            val client = LocationServices.getFusedLocationProviderClient(context)
-            val cts = CancellationTokenSource()
-            client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
-                .addOnSuccessListener { loc ->
-                    cont.resume(if (loc != null) LatLng(loc.latitude, loc.longitude) else null)
-                }
-                .addOnFailureListener { cont.resume(null) }
-            cont.invokeOnCancellation { cts.cancel() }
-        }
 }
 
 // ── 工具：事件類型轉中文 ──────────────────────────────────────────────────────
@@ -195,10 +183,9 @@ fun MapScreen(
     viewModel: MapViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val selectedLatLng by AppLocationState.selectedLatLng.collectAsState()
 
-    LaunchedEffect(Unit) { viewModel.fetchMapData(context) }
+    LaunchedEffect(Unit) { viewModel.fetchMapData() }
 
     val taiwan = LatLng(23.6978, 120.9605)
     val cameraPositionState = rememberCameraPositionState {
@@ -373,6 +360,23 @@ fun MapScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text((uiState as MapUiState.Error).message, color = RedText)
+                }
+            }
+
+            // ── 未授權定位提示：地圖資料照常顯示，只是少了「你在這裡」 ─────────
+            if ((uiState as? MapUiState.Success)?.locationPermissionDenied == true) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.White.copy(alpha = 0.92f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        "未開啟定位權限，地圖不會標出你的位置；可於首頁改選常用地點",
+                        color = TextMid, fontSize = 13.sp
+                    )
                 }
             }
 

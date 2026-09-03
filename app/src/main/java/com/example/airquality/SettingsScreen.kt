@@ -12,65 +12,43 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import android.content.Context
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.airquality.data.FavoriteLocation
 import com.example.airquality.ui.theme.*
-import kotlinx.coroutines.launch
-
-private data class FavLocation(val name: String, val address: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    viewModel: SettingsViewModel = viewModel()
+) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("health_profile", Context.MODE_PRIVATE) }
-    val scope = rememberCoroutineScope()
 
     // ── 通知設定 state ────────────────────────────────────────────────────
-    val notifPrefs = remember { context.getSharedPreferences("notification_settings", Context.MODE_PRIVATE) }
-    var dailyNotificationEnabled by remember {
-        mutableStateOf(notifPrefs.getBoolean("daily_enabled", false))
-    }
-    var dailyHour   by remember { mutableIntStateOf(notifPrefs.getInt("daily_hour", 8)) }
-    var dailyMinute by remember { mutableIntStateOf(notifPrefs.getInt("daily_minute", 0)) }
+    val dailyNotificationEnabled by viewModel.dailyEnabled.collectAsState()
+    val dailyHour   by viewModel.dailyHour.collectAsState()
+    val dailyMinute by viewModel.dailyMinute.collectAsState()
+    val sensitiveAlertsEnabled by viewModel.sensitiveAlertsEnabled.collectAsState()
     var showTimePicker by remember { mutableStateOf(false) }
 
-    fun syncDailyNotification(enabled: Boolean, hour: Int, minute: Int) {
-        val token = TokenManager.getToken(context) ?: return
-        scope.launch {
-            try {
-                RetrofitClient.apiService.setDailyNotification(
-                    DailyNotificationRequest(token = token, enabled = enabled, hour = hour, minute = minute)
-                )
-            } catch (_: Exception) {}
-        }
-    }
+    // ── 健康檔案 state（編輯中的暫存值，按下儲存才寫回）────────────────────
+    val savedAgeGroup   by viewModel.ageGroup.collectAsState()
+    val savedConditions by viewModel.conditions.collectAsState()
+    val savedOtherNotes by viewModel.otherNotes.collectAsState()
 
-    // ── 健康檔案 state（從 SharedPreferences 載入）────────────────────────
-    var selectedAgeGroup  by remember { mutableStateOf(prefs.getString("health_age_group", "18-64歲") ?: "18-64歲") }
-    var otherText         by remember { mutableStateOf(prefs.getString("health_other",     "") ?: "") }
-
-    val savedConditions = prefs.getString("health_conditions", "") ?: ""
-    val selectedConditions = remember {
-        mutableStateListOf<String>().also { list ->
-            if (savedConditions.isNotEmpty()) list.addAll(savedConditions.split(","))
-        }
+    var selectedAgeGroup by remember(savedAgeGroup) { mutableStateOf(savedAgeGroup) }
+    var otherText        by remember(savedOtherNotes) { mutableStateOf(savedOtherNotes) }
+    val selectedConditions = remember(savedConditions) {
+        mutableStateListOf<String>().also { it.addAll(savedConditions) }
     }
     var showHealthDialog by remember { mutableStateOf(false) }
 
     // ── 常用地點 state ────────────────────────────────────────────────────────
-    val favLocations = remember {
-        mutableStateListOf<FavLocation>().also { list ->
-            val count = prefs.getInt("fav_count", 0)
-            (1..count).forEach { i ->
-                val name    = prefs.getString("fav_${i}_name",    "") ?: ""
-                val address = prefs.getString("fav_${i}_address", "") ?: ""
-                if (name.isNotEmpty() || address.isNotEmpty())
-                    list.add(FavLocation(name, address))
-            }
-        }
+    val savedFavorites by viewModel.favorites.collectAsState()
+    val favLocations = remember(savedFavorites) {
+        mutableStateListOf<FavoriteLocation>().also { it.addAll(savedFavorites) }
     }
     var showLocationsDialog by remember { mutableStateOf(false) }
     var editingIndex by remember { mutableStateOf<Int?>(null) }
@@ -82,6 +60,11 @@ fun SettingsScreen() {
 
     // ── Snackbar ──────────────────────────────────────────────────────────
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // 設定寫回後端成功或失敗都要讓使用者知道（原本失敗是靜默的）
+    LaunchedEffect(Unit) {
+        viewModel.message.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -115,11 +98,7 @@ fun SettingsScreen() {
                     SettingSwitchRow(
                         label = "每日空氣品質通知",
                         checked = dailyNotificationEnabled,
-                        onCheckedChange = { checked ->
-                            dailyNotificationEnabled = checked
-                            notifPrefs.edit().putBoolean("daily_enabled", checked).apply()
-                            syncDailyNotification(checked, dailyHour, dailyMinute)
-                        }
+                        onCheckedChange = { viewModel.setDailyEnabled(it) }
                     )
                     if (dailyNotificationEnabled) {
                         HorizontalDivider(color = DividerColor, modifier = Modifier.padding(vertical = 2.dp))
@@ -143,32 +122,29 @@ fun SettingsScreen() {
                 Spacer(Modifier.height(12.dp))
 
                 OutlinedButton(
-                    onClick = {
-                        val token = TokenManager.getToken(context)
-                        if (token == null) {
-                            scope.launch { snackbarHostState.showSnackbar("尚未取得裝置 Token，請稍後再試") }
-                        } else {
-                            scope.launch {
-                                val message = try {
-                                    val resp = RetrofitClient.apiService.testDailyNotification(
-                                        DailyNotificationTestRequest(token = token)
-                                    )
-                                    if (resp.status == "success")
-                                        "✅ 測試通知已發送（${resp.county} AQI ${resp.aqi}）"
-                                    else
-                                        "⚠️ ${resp.message ?: "發送失敗"}"
-                                } catch (e: Exception) {
-                                    "⚠️ 發送失敗：${e.message}"
-                                }
-                                snackbarHostState.showSnackbar(message)
-                            }
-                        }
-                    },
+                    onClick = { viewModel.sendTestNotification() },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeMain)
                 ) {
                     Text("🔔 發送測試通知", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // ── 敏感族群警示推播（健康屬性的明確同意）─────────────────
+                SettingSection("敏感族群警示") {
+                    Text(
+                        "開啟後，你在健康檔案填寫的年齡層與生理狀態會傳送至伺服器，" +
+                            "作為空品惡化時優先警示的分眾依據。關閉時伺服器會一併清除這份資料。",
+                        color = TextGray, fontSize = 13.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    SettingSwitchRow(
+                        label = "依健康狀況發送警示",
+                        checked = sensitiveAlertsEnabled,
+                        onCheckedChange = { viewModel.setSensitiveAlertsEnabled(it) }
+                    )
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -206,13 +182,10 @@ fun SettingsScreen() {
             onOtherTextChange  = { otherText = it },
             onDismiss          = { showHealthDialog = false },
             onSave = {
-                prefs.edit()
-                    .putString("health_age_group",  selectedAgeGroup)
-                    .putString("health_conditions", selectedConditions.joinToString(","))
-                    .putString("health_other",      otherText)
-                    .apply()
+                viewModel.saveHealthProfile(
+                    selectedAgeGroup, selectedConditions.toList(), otherText
+                )
                 showHealthDialog = false
-                scope.launch { snackbarHostState.showSnackbar("✅ 健康檔案已儲存於本機") }
             }
         )
     }
@@ -272,16 +245,10 @@ fun SettingsScreen() {
             confirmButton = {
                 TextButton(onClick = {
                     val i = editingIndex ?: return@TextButton
-                    val newFav = FavLocation(editName.trim(), editAddress.trim())
+                    val newFav = FavoriteLocation(editName.trim(), editAddress.trim())
                     if (isNew) favLocations.add(newFav)
                     else favLocations[i] = newFav
-                    // 重寫所有地點到 prefs
-                    val editor = prefs.edit()
-                    favLocations.forEachIndexed { idx, f ->
-                        editor.putString("fav_${idx + 1}_name",    f.name)
-                        editor.putString("fav_${idx + 1}_address", f.address)
-                    }
-                    editor.putInt("fav_count", favLocations.size).apply()
+                    viewModel.saveFavorites(favLocations.toList())
                     editingIndex = null
                 }) { Text("儲存", color = OrangeMain) }
             },
@@ -291,12 +258,7 @@ fun SettingsScreen() {
                         TextButton(onClick = {
                             val i = editingIndex ?: return@TextButton
                             favLocations.removeAt(i)
-                            val editor = prefs.edit()
-                            favLocations.forEachIndexed { idx, f ->
-                                editor.putString("fav_${idx + 1}_name",    f.name)
-                                editor.putString("fav_${idx + 1}_address", f.address)
-                            }
-                            editor.putInt("fav_count", favLocations.size).apply()
+                            viewModel.saveFavorites(favLocations.toList())
                             editingIndex = null
                         }) { Text("刪除", color = RedText) }
                     }
@@ -314,13 +276,7 @@ fun SettingsScreen() {
             initialMinute = dailyMinute,
             onDismiss = { showTimePicker = false },
             onConfirm = { hour, minute ->
-                dailyHour = hour
-                dailyMinute = minute
-                notifPrefs.edit()
-                    .putInt("daily_hour", hour)
-                    .putInt("daily_minute", minute)
-                    .apply()
-                syncDailyNotification(true, hour, minute)
+                viewModel.setDailyTime(hour, minute)
                 showTimePicker = false
             }
         )
@@ -368,12 +324,14 @@ private const val USER_GUIDE_TEXT =
     "- 點右上角地圖圖示，可看官方火災警示與回報熱點地圖。\n\n" +
     "5. 設定\n" +
     "- 開關每日空氣品質通知並設定推播時間。\n" +
-    "- 編輯個人健康檔案（僅儲存於本機）。\n" +
+    "- 開關「敏感族群警示」，決定是否讓伺服器依你的健康狀況優先發送警示。\n" +
+    "- 編輯個人健康檔案（預設僅儲存於本機）。\n" +
     "- 新增常用地點，方便快速切換查詢。"
 
-// 隱私權政策完整版網頁（設定頁點擊後以瀏覽器開啟）
-private const val PRIVACY_URL =
-    "https://yu-peihsuan.github.io/AirQuality-privacy-policy/privacy_site/PrivacyPolicy.html"
+// 隱私權政策完整版網頁（設定頁與首次同意彈窗都會連到這裡）
+// 註：政策檔案已改名為 repo 根目錄的 index.html，舊的 privacy_site/PrivacyPolicy.html 路徑會 404
+internal const val PRIVACY_URL =
+    "https://yu-peihsuan.github.io/AirQuality-privacy-policy/"
 
 // ── 個人健康檔案 Dialog ──────────────────────────────────────────────────────
 
@@ -403,7 +361,8 @@ private fun HealthProfileDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    "⚠️ 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會將相關健康屬性傳送至伺服器以生成建議。",
+                    "⚠️ 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會傳送至伺服器以生成建議；" +
+                        "若另行開啟「敏感族群警示」，這些資料會保存於伺服器作為推播分眾依據，關閉即刪除。",
                     color = TextGray, fontSize = 12.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
@@ -461,7 +420,7 @@ private fun HealthProfileDialog(
 
 @Composable
 private fun LocationsDialog(
-    favLocations: List<FavLocation>,
+    favLocations: List<FavoriteLocation>,
     onDismiss: () -> Unit,
     onAddClick: () -> Unit,
     onItemClick: (Int) -> Unit
