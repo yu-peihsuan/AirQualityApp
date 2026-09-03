@@ -30,11 +30,22 @@ open class NotificationSettingsRepository(context: Context) {
         get() = prefs.getBoolean(KEY_SENSITIVE_ALERTS, false)
         set(value) { prefs.edit().putBoolean(KEY_SENSITIVE_ALERTS, value).apply() }
 
+    /**
+     * 是否已經問過使用者要不要開啟敏感族群警示。
+     *
+     * 首次啟動的同意彈窗只跳一次：不論使用者按同意或先不要，都記成「已問過」，
+     * 之後改由設定頁的開關管理，不再打擾。
+     */
+    open var hasAskedSensitiveAlertsConsent: Boolean
+        get() = prefs.getBoolean(KEY_CONSENT_ASKED, false)
+        set(value) { prefs.edit().putBoolean(KEY_CONSENT_ASKED, value).apply() }
+
     private companion object {
         const val PREFS = "notification_settings"
         const val KEY_DAILY_ENABLED = "daily_enabled"
         const val KEY_DAILY_HOUR = "daily_hour"
         const val KEY_DAILY_MINUTE = "daily_minute"
         const val KEY_SENSITIVE_ALERTS = "sensitive_alerts_enabled"
+        const val KEY_CONSENT_ASKED = "sensitive_alerts_consent_asked"
     }
 }

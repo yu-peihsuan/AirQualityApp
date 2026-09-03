@@ -61,7 +61,10 @@ import java.util.Calendar
 
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    // 與設定頁共用同一個 Activity 範圍的實例，所以彈窗按下同意後，
+    // 設定頁那個開關會直接是開啟狀態，不需要額外同步
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
 
@@ -70,6 +73,9 @@ fun HomeScreen(
     val isRaining           by viewModel.isRaining.collectAsState()
     val currentLocationName by viewModel.currentLocationName.collectAsState()
     val favorites           by viewModel.favorites.collectAsState()
+    val shouldAskConsent    by settingsViewModel.shouldAskSensitiveAlertsConsent.collectAsState()
+    // 同意彈窗要等系統權限對話框走完才跳，否則首次啟動會變成三個視窗疊在一起
+    var permissionFlowDone  by remember { mutableStateOf(false) }
     val conditions          by viewModel.healthConditions.collectAsState()
     var showLocationDialog  by remember { mutableStateOf(false) }
     // 首頁直接新增常用地點（不必進設定頁）
@@ -88,6 +94,7 @@ fun HomeScreen(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
         viewModel.loadInitialLocation()
+        permissionFlowDone = true
 
         // 未授權定位、也沒選過任何地區 → 引導使用者必須自行選擇一個常用地點
         if (!viewModel.hasLocationPermission() && !viewModel.hasSavedChoice()) {
@@ -129,6 +136,7 @@ fun HomeScreen(
             permissionLauncher.launch(perms.toTypedArray())   // 載入交由上方回呼處理
         } else {
             viewModel.loadInitialLocation()
+            permissionFlowDone = true
         }
     }
 
@@ -184,6 +192,15 @@ fun HomeScreen(
             date = currentDateString,
             onLocationSwitchClick = { showLocationDialog = true }
         )
+
+        // ── 首次啟動：健康資料用於推播分眾的同意詢問 ────────────────────
+        // 未取得同意前，FcmTokenRepository 送出的 conditions 一律是空字串，
+        // 沒有任何健康資料會離開裝置（見隱私權政策第二節）。
+        if (permissionFlowDone && shouldAskConsent && !showLocationDialog) {
+            SensitiveAlertsConsentDialog(
+                onDecision = { settingsViewModel.onSensitiveAlertsConsent(it) }
+            )
+        }
 
         // ── 地點切換 Dialog ──────────────────────────────────────────────
         if (showLocationDialog) {
