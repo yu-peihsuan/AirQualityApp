@@ -1,19 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   API 31 以上的備份與裝置轉移規則。排除理由見 backup_rules.xml。
+   device-transfer（換機直接傳輸）同樣要排除憑證，否則兩台裝置會共用同一個身分。
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="sharedpref" path="auth.xml"/>
+        <exclude domain="sharedpref" path="fcm.xml"/>
+        <exclude domain="sharedpref" path="health_profile.xml"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="auth.xml"/>
+        <exclude domain="sharedpref" path="fcm.xml"/>
+        <exclude domain="sharedpref" path="health_profile.xml"/>
     </device-transfer>
-    -->
 </data-extraction-rules>
