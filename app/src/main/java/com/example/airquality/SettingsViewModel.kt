@@ -56,13 +56,12 @@ class SettingsViewModel(
     val favorites: StateFlow<List<FavoriteLocation>> = _favorites.asStateFlow()
 
     /**
-     * 是否該跳出首次的健康資料同意彈窗。
-     * 只在「還沒問過」時為 true；使用者做過選擇之後永遠是 false。
+     * 是否該跳出首次的健康檔案說明彈窗。看過一次之後永遠是 false。
      */
-    private val _shouldAskSensitiveAlertsConsent =
-        MutableStateFlow(!notificationSettings.hasAskedSensitiveAlertsConsent)
-    val shouldAskSensitiveAlertsConsent: StateFlow<Boolean> =
-        _shouldAskSensitiveAlertsConsent.asStateFlow()
+    private val _shouldShowHealthProfileIntro =
+        MutableStateFlow(!notificationSettings.hasSeenHealthProfileIntro)
+    val shouldShowHealthProfileIntro: StateFlow<Boolean> =
+        _shouldShowHealthProfileIntro.asStateFlow()
 
     /** 要顯示給使用者的一次性訊息（Snackbar）。 */
     private val _message = MutableSharedFlow<String>(extraBufferCapacity = 4)
@@ -146,16 +145,12 @@ class SettingsViewModel(
     }
 
     /**
-     * 首次同意彈窗的結果。不論同意與否都記成「已問過」，彈窗不再出現；
-     * 使用者日後改變心意，走設定頁的開關。
-     *
-     * 拒絕時不必呼叫後端——預設本來就是關閉、conditions 送空字串，
-     * 沒有任何健康資料被送出過。
+     * 說明彈窗看過了，不再跳出。這裡不改任何同意狀態——把健康屬性送到
+     * 伺服器的開關預設是關的，要由使用者自己在健康檔案裡打開。
      */
-    fun onSensitiveAlertsConsent(granted: Boolean) {
-        notificationSettings.hasAskedSensitiveAlertsConsent = true
-        _shouldAskSensitiveAlertsConsent.value = false
-        if (granted) setSensitiveAlertsEnabled(true)
+    fun onHealthProfileIntroShown() {
+        notificationSettings.hasSeenHealthProfileIntro = true
+        _shouldShowHealthProfileIntro.value = false
     }
 
     // ── 健康檔案 ──────────────────────────────────────────────────────────

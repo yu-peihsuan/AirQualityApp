@@ -22,40 +22,42 @@ import com.example.airquality.ui.theme.TextDark
 import com.example.airquality.ui.theme.TextGray
 
 /**
- * 首次啟動時徵詢是否同意將健康屬性用於推播分眾。
+ * 首次啟動時說明本App為什麼需要健康狀況，並帶使用者去填寫。
  *
- * 健康屬性屬於特種個人資料，依個資法需取得明示同意，所以預設一律關閉，
- * 使用者按下「同意」之前不會有任何健康資料離開裝置。
+ * 這個彈窗**不代表任何同意**——它只做說明與引導。把健康屬性送到伺服器的
+ * 明確同意放在健康檔案裡的開關上：使用者一邊看著自己填的病史、一邊決定
+ * 要不要分享，比在開場對著一個還沒填任何資料的彈窗按「同意」有意義得多。
  *
- * 文案刻意只講「用在哪裡、可以關掉」兩件事——完整的保存期間、刪除機制與
- * 第三方揭露寫在隱私權政策裡，由下方連結帶過去，彈窗不重複整段條文。
- *
- * 這個彈窗一輩子只跳一次（不論同意與否），之後改由設定頁的開關管理。
+ * 只跳一次，不論使用者選哪個。
  */
 @Composable
-fun SensitiveAlertsConsentDialog(
-    onDecision: (granted: Boolean) -> Unit
+fun HealthProfileIntroDialog(
+    onDismiss: () -> Unit,
+    onGoToHealthProfile: () -> Unit
 ) {
     val context = LocalContext.current
 
     AlertDialog(
-        // 點外面關掉視為「先不要」——預設關閉是安全的一邊，也不會一直重複詢問
-        onDismissRequest = { onDecision(false) },
+        onDismissRequest = onDismiss,
         containerColor = BgMain,
         title = {
-            Text("要開啟敏感族群警示嗎？", fontWeight = FontWeight.Bold, color = TextDark)
+            Text("為什麼需要你的健康狀況？", fontWeight = FontWeight.Bold, color = TextDark)
         },
         text = {
             Column {
                 Text(
-                    "空氣品質中等偏差（AQI 101-150）時優先提醒你。這個區間主要影響氣喘、" +
-                        "心血管疾病、孕婦、長者與孩童。",
+                    "同樣的空氣品質，對氣喘、心血管疾病、孕婦、長者與孩童的影響並不一樣。",
                     color = TextDark, fontSize = 14.sp, lineHeight = 21.sp
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "需要將健康檔案中的年齡層與生理狀態傳送至伺服器，僅用於判斷要推播給誰。" +
-                        "隨時可在「設定」關閉，關閉時一併刪除。",
+                    "填寫年齡層與身體狀況後，AI 顧問會依你的情況給個人化的防護建議，" +
+                        "首頁的行動建議也會跟著調整。",
+                    color = TextDark, fontSize = 14.sp, lineHeight = 21.sp
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "這份資料預設只存在你的裝置上，可以隨時修改或清除。",
                     color = TextGray, fontSize = 13.sp, lineHeight = 20.sp
                 )
                 Spacer(Modifier.height(12.dp))
@@ -71,13 +73,13 @@ fun SensitiveAlertsConsentDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onDecision(true) }) {
-                Text("同意", color = OrangeMain, fontWeight = FontWeight.SemiBold)
+            TextButton(onClick = onGoToHealthProfile) {
+                Text("去填寫", color = OrangeMain, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
-            TextButton(onClick = { onDecision(false) }) {
-                Text("先不要", color = TextGray)
+            TextButton(onClick = onDismiss) {
+                Text("稍後再說", color = TextGray)
             }
         }
     )

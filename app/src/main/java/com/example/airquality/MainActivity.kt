@@ -51,6 +51,9 @@ fun AppEntry() {
 @Composable
 fun MainScreen(initialTab: Int = 0) {
     var selectedTab by remember { mutableIntStateOf(initialTab) }
+    // 首次同意健康資料後，直接把使用者帶到設定頁並展開健康檔案——
+    // 同意了卻沒填任何狀況的話，分眾推播等於沒作用
+    var openHealthProfile by remember { mutableStateOf(false) }
 
     val navItems = listOf(
         NavItem("首頁",   R.drawable.home),
@@ -68,11 +71,19 @@ fun MainScreen(initialTab: Int = 0) {
     ) { padding ->
         Box(Modifier.padding(bottom = padding.calculateBottomPadding()).fillMaxSize()) {
             when (selectedTab) {
-                0 -> HomeScreen()
+                0 -> HomeScreen(
+                    onGoToHealthProfile = {
+                        openHealthProfile = true
+                        selectedTab = 4
+                    }
+                )
                 1 -> AiHealthScreen()
                 2 -> ReportScreen()
                 3 -> NotificationScreen()
-                4 -> SettingsScreen()
+                4 -> SettingsScreen(
+                    openHealthProfile = openHealthProfile,
+                    onHealthProfileOpened = { openHealthProfile = false }
+                )
             }
         }
     }

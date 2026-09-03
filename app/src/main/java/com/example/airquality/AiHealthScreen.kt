@@ -37,9 +37,12 @@ fun AiHealthScreen(
     // 觀測 RAG 建議狀態
     val ragAdviceState by homeViewModel.ragAdviceState.collectAsState()
 
-    // 進入畫面時自動觸發 RAG 建議
-    LaunchedEffect(aqiState) {
-        if (aqiState is AqiUiState.Success) {
+    val hasConsented by homeViewModel.hasConsentedToAiSharing.collectAsState()
+
+    // 已同意過才自動產生。首次進來一定要由使用者按下按鈕——健康屬性會轉交
+    // 第三方（OpenRouter），Google Play 要求在送出前於畫面上揭露並取得肯定操作。
+    LaunchedEffect(aqiState, hasConsented) {
+        if (hasConsented && aqiState is AqiUiState.Success) {
             homeViewModel.fetchRagAdvice()
         }
     }
@@ -70,11 +73,22 @@ fun AiHealthScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
+            // ── 首次使用：揭露資料流向並取得明確同意 ──────────────────
+            if (!hasConsented) {
+                AiSharingDisclosureCard(
+                    onAgree = {
+                        homeViewModel.grantAiSharingConsent()
+                        homeViewModel.fetchRagAdvice()
+                    }
+                )
+                Spacer(Modifier.height(20.dp))
+            }
+
             when (val state = ragAdviceState) {
 
                 // 尚未載入
                 is RagAdviceUiState.Idle -> {
-                    RagPlaceholderCard("點擊下方按鈕取得個人化建議")
+                    if (hasConsented) RagPlaceholderCard("點擊下方按鈕取得個人化建議")
                 }
 
                 // 載入中
@@ -141,11 +155,12 @@ fun AiHealthScreen(
             Spacer(Modifier.height(20.dp))
 
             // ── 重新取得建議按鈕 ──────────────────────────────────────────
+            // 尚未同意前不顯示——否則等於繞過上方那張揭露卡直接送出資料
             OutlinedButton(
                 onClick = { homeViewModel.fetchRagAdvice() },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
-                enabled = ragAdviceState !is RagAdviceUiState.Loading
+                enabled = hasConsented && ragAdviceState !is RagAdviceUiState.Loading
             ) {
                 Icon(
                     Icons.Outlined.Refresh,
@@ -288,6 +303,56 @@ fun DownwindWarningCard(typeLabel: String, distText: String, windDir: String) {
                 color = Color(0xFF5D4037),
                 lineHeight = 21.sp
             )
+        }
+    }
+}
+/**
+ * 首次使用 AI 建議前的揭露卡。
+ *
+ * Google Play 的 Prominent Disclosure & Consent 要求：把健康這類個人敏感資料
+ * 交給第三方之前，揭露必須出現在 App 的一般使用流程中（不能只放在設定頁或
+ * 隱私權政策），並且要有明確的肯定操作。所以這張卡直接長在 AI 顧問頁上，
+ * 使用者按下按鈕才會送出第一筆請求。
+ */
+@Composable
+private fun AiSharingDisclosureCard(onAgree: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFFFFF6EC))
+            .padding(16.dp)
+    ) {
+        Text(
+            "產生個人化建議前",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF333333)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "AI 顧問會將你在「個人健康檔案」填寫的年齡層與身體狀況，" +
+                "連同所在縣市與當前空氣品質，傳送至本App伺服器並轉交第三方 AI 服務" +
+                "（OpenRouter）以生成建議。",
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            color = Color(0xFF555555)
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "這些資料僅於生成建議當下使用，不會與你的身分建立關聯後保存。",
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            color = Color(0xFF888888)
+        )
+        Spacer(Modifier.height(14.dp))
+        Button(
+            onClick = onAgree,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = OrangeMain)
+        ) {
+            Text("同意並產生建議", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = White)
         }
     }
 }
