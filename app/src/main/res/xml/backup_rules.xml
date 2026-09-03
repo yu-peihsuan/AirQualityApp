@@ -1,13 +1,20 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Android 自動備份（API 30 以下）。API 31 以上請見 data_extraction_rules.xml。
+
+   預設會把所有 SharedPreferences 上傳到使用者的 Google Drive。下列三份予以排除：
+
+   - auth.xml：裝置憑證（access／refresh token）。還原到另一台裝置會讓那台
+     直接繼承原本的假名化裝置身分，使通報頻率限制、推播設定歸屬與封鎖機制失效。
+   - fcm.xml：推播識別碼綁定安裝實例，還原後必為失效值，留著只會讓 App 拿著
+     一個死 token 直到 Firebase 重新發放。
+   - health_profile.xml：健康屬性屬於特種個人資料，不隨備份離開這台裝置。
+     代價是使用者換手機需重新填寫健康檔案，並重新開啟「依健康狀況發送警示」。
+
+   憑證與推播識別碼都會在下次啟動時自動重新取得，使用者無感。
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="sharedpref" path="auth.xml"/>
+    <exclude domain="sharedpref" path="fcm.xml"/>
+    <exclude domain="sharedpref" path="health_profile.xml"/>
 </full-backup-content>

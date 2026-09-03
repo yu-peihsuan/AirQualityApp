@@ -81,6 +81,16 @@ class HomeViewModel(
     private val _favorites = MutableStateFlow(locationPreference.favorites())
     val favorites: StateFlow<List<FavoriteLocation>> = _favorites.asStateFlow()
 
+    // 是否已同意把健康屬性送出生成 AI 建議（Play 的揭露與同意要求，見 Repository 註解）
+    private val _hasConsentedToAiSharing = MutableStateFlow(healthProfile.hasConsentedToAiSharing)
+    val hasConsentedToAiSharing: StateFlow<Boolean> = _hasConsentedToAiSharing.asStateFlow()
+
+    /** 使用者在 AI 顧問頁按下「產生建議」＝取得明確同意，之後不再詢問。 */
+    fun grantAiSharingConsent() {
+        healthProfile.hasConsentedToAiSharing = true
+        _hasConsentedToAiSharing.value = true
+    }
+
     // 健康狀況（首頁的行動建議依此挑選），畫面不再自己讀 SharedPreferences
     private val _healthConditions = MutableStateFlow(healthProfile.conditions)
     val healthConditions: StateFlow<List<String>> = _healthConditions.asStateFlow()

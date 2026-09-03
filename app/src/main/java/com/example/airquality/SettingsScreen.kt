@@ -22,6 +22,9 @@ import com.example.airquality.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    // 由首次同意流程帶進來：進場時直接展開健康檔案對話框
+    openHealthProfile: Boolean = false,
+    onHealthProfileOpened: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -44,6 +47,15 @@ fun SettingsScreen(
         mutableStateListOf<String>().also { it.addAll(savedConditions) }
     }
     var showHealthDialog by remember { mutableStateOf(false) }
+
+    // 從同意彈窗導過來時自動展開健康檔案。回報一次就把旗標清掉，
+    // 否則使用者關掉對話框後切回首頁再回來，它又會自己跳出來。
+    LaunchedEffect(openHealthProfile) {
+        if (openHealthProfile) {
+            showHealthDialog = true
+            onHealthProfileOpened()
+        }
+    }
 
     // ── 常用地點 state ────────────────────────────────────────────────────────
     val savedFavorites by viewModel.favorites.collectAsState()
@@ -132,23 +144,6 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(20.dp))
 
-                // ── 敏感族群警示推播（健康屬性的明確同意）─────────────────
-                SettingSection("敏感族群警示") {
-                    Text(
-                        "開啟後，你在健康檔案填寫的年齡層與生理狀態會傳送至伺服器，" +
-                            "作為空品惡化時優先警示的分眾依據。關閉時伺服器會一併清除這份資料。",
-                        color = TextGray, fontSize = 13.sp,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    SettingSwitchRow(
-                        label = "依健康狀況發送警示",
-                        checked = sensitiveAlertsEnabled,
-                        onCheckedChange = { viewModel.setSensitiveAlertsEnabled(it) }
-                    )
-                }
-
-                Spacer(Modifier.height(20.dp))
-
                 // ── 其他設定：點開才顯示詳細內容 ─────────────────────────
                 SettingSection(title = null) {
                     SettingLinkRow("個人健康檔案") { showHealthDialog = true }
@@ -175,6 +170,8 @@ fun SettingsScreen(
     // ── 個人健康檔案 彈跳視窗 ───────────────────────────────────────────────
     if (showHealthDialog) {
         HealthProfileDialog(
+            sensitiveAlertsEnabled = sensitiveAlertsEnabled,
+            onSensitiveAlertsChange = { viewModel.setSensitiveAlertsEnabled(it) },
             selectedAgeGroup   = selectedAgeGroup,
             onAgeGroupChange   = { selectedAgeGroup = it },
             selectedConditions = selectedConditions,
@@ -324,20 +321,22 @@ private const val USER_GUIDE_TEXT =
     "- 點右上角地圖圖示，可看官方火災警示與回報熱點地圖。\n\n" +
     "5. 設定\n" +
     "- 開關每日空氣品質通知並設定推播時間。\n" +
-    "- 開關「敏感族群警示」，決定是否讓伺服器依你的健康狀況優先發送警示。\n" +
-    "- 編輯個人健康檔案（預設僅儲存於本機）。\n" +
+
+    "- 編輯個人健康檔案（預設僅儲存於本機），並可決定是否讓伺服器依你的健康狀況優先發送警示。\n" +
     "- 新增常用地點，方便快速切換查詢。"
 
 // 隱私權政策完整版網頁（設定頁與首次同意彈窗都會連到這裡）
-// 註：政策檔案已改名為 repo 根目錄的 index.html，舊的 privacy_site/PrivacyPolicy.html 路徑會 404
+// 正式站台為 Vercel；GitHub Pages 那份路徑已失效，不要改回去
 internal const val PRIVACY_URL =
-    "https://yu-peihsuan.github.io/AirQuality-privacy-policy/"
+    "https://air-quality-privacy-policy.vercel.app/"
 
 // ── 個人健康檔案 Dialog ──────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun HealthProfileDialog(
+    sensitiveAlertsEnabled: Boolean,
+    onSensitiveAlertsChange: (Boolean) -> Unit,
     selectedAgeGroup: String,
     onAgeGroupChange: (String) -> Unit,
     selectedConditions: MutableList<String>,
@@ -361,9 +360,9 @@ private fun HealthProfileDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    "⚠️ 健康資料儲存於您的裝置。僅在使用 AI 個人化建議時，才會傳送至伺服器以生成建議；" +
-                        "若另行開啟「敏感族群警示」，這些資料會保存於伺服器作為推播分眾依據，關閉即刪除。",
-                    color = TextGray, fontSize = 12.sp,
+                    "這份資料儲存於你的裝置，用來讓 AI 顧問與首頁建議更貼近你的情況。" +
+                        "使用 AI 建議時會即時傳送至伺服器生成建議，不會保存。",
+                    color = TextGray, fontSize = 12.sp, lineHeight = 18.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
                 HealthFieldLabel("年齡層")
@@ -404,6 +403,25 @@ private fun HealthProfileDialog(
                     colors = healthTextFieldColors(),
                     minLines = 2,
                     maxLines = 4
+                )
+
+                Spacer(Modifier.height(20.dp))
+                HorizontalDivider(color = DividerColor)
+                Spacer(Modifier.height(12.dp))
+
+                // 把健康屬性送到伺服器的明確同意就在這裡——使用者一邊看著自己
+                // 填的病史、一邊決定要不要分享，比在開場的彈窗上按同意有意義。
+                HealthFieldLabel("依健康狀況發送警示")
+                Text(
+                    "開啟後，以上資料會傳送並保存於伺服器，" +
+                        "讓空氣品質變差時能優先提醒你。關閉時伺服器會一併刪除。",
+                    color = TextGray, fontSize = 12.sp, lineHeight = 18.sp,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+                )
+                SettingSwitchRow(
+                    label = if (sensitiveAlertsEnabled) "已開啟" else "未開啟",
+                    checked = sensitiveAlertsEnabled,
+                    onCheckedChange = onSensitiveAlertsChange
                 )
             }
         },

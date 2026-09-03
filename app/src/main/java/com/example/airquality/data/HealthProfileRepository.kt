@@ -27,6 +27,18 @@ open class HealthProfileRepository(context: Context) {
         get() = prefs.getString(KEY_OTHER, "") ?: ""
         set(value) { prefs.edit().putString(KEY_OTHER, value).apply() }
 
+    /**
+     * 是否已同意將健康屬性送出以生成 AI 建議。
+     *
+     * Google Play 的 Prominent Disclosure & Consent 要求：把個人敏感資料
+     * （健康資訊）交給第三方前，必須在 App 內、於一般使用流程中揭露，並取得
+     * 明確的肯定操作（點擊接受），不能只寫在設定頁或隱私權政策裡。
+     * AI 建議會把這份資料轉交 OpenRouter，因此第一次產生前必須由使用者按下按鈕。
+     */
+    open var hasConsentedToAiSharing: Boolean
+        get() = prefs.getBoolean(KEY_AI_CONSENT, false)
+        set(value) { prefs.edit().putBoolean(KEY_AI_CONSENT, value).apply() }
+
     open fun save(ageGroup: String, conditions: List<String>, otherNotes: String) {
         prefs.edit()
             .putString(KEY_AGE_GROUP, ageGroup)
@@ -71,6 +83,7 @@ open class HealthProfileRepository(context: Context) {
         const val KEY_AGE_GROUP = "health_age_group"
         const val KEY_CONDITIONS = "health_conditions"
         const val KEY_OTHER = "health_other"
+        const val KEY_AI_CONSENT = "ai_sharing_consented"
         const val DEFAULT_AGE_GROUP = "18-64歲"
     }
 }

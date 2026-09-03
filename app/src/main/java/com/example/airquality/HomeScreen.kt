@@ -61,6 +61,8 @@ import java.util.Calendar
 
 @Composable
 fun HomeScreen(
+    // 看完說明後把使用者帶去設定頁填健康檔案
+    onGoToHealthProfile: () -> Unit = {},
     viewModel: HomeViewModel = viewModel(),
     // 與設定頁共用同一個 Activity 範圍的實例，所以彈窗按下同意後，
     // 設定頁那個開關會直接是開啟狀態，不需要額外同步
@@ -73,8 +75,8 @@ fun HomeScreen(
     val isRaining           by viewModel.isRaining.collectAsState()
     val currentLocationName by viewModel.currentLocationName.collectAsState()
     val favorites           by viewModel.favorites.collectAsState()
-    val shouldAskConsent    by settingsViewModel.shouldAskSensitiveAlertsConsent.collectAsState()
-    // 同意彈窗要等系統權限對話框走完才跳，否則首次啟動會變成三個視窗疊在一起
+    val shouldShowIntro     by settingsViewModel.shouldShowHealthProfileIntro.collectAsState()
+    // 說明彈窗要等系統權限對話框走完才跳，否則首次啟動會變成三個視窗疊在一起
     var permissionFlowDone  by remember { mutableStateOf(false) }
     val conditions          by viewModel.healthConditions.collectAsState()
     var showLocationDialog  by remember { mutableStateOf(false) }
@@ -193,12 +195,16 @@ fun HomeScreen(
             onLocationSwitchClick = { showLocationDialog = true }
         )
 
-        // ── 首次啟動：健康資料用於推播分眾的同意詢問 ────────────────────
-        // 未取得同意前，FcmTokenRepository 送出的 conditions 一律是空字串，
-        // 沒有任何健康資料會離開裝置（見隱私權政策第二節）。
-        if (permissionFlowDone && shouldAskConsent && !showLocationDialog) {
-            SensitiveAlertsConsentDialog(
-                onDecision = { settingsViewModel.onSensitiveAlertsConsent(it) }
+        // ── 首次啟動：說明為什麼需要健康狀況，並引導去填寫 ──────────────
+        // 這個彈窗只做說明，不代表同意。把健康屬性送到伺服器的開關在
+        // 健康檔案裡，預設關閉（見隱私權政策第二節）。
+        if (permissionFlowDone && shouldShowIntro && !showLocationDialog) {
+            HealthProfileIntroDialog(
+                onDismiss = { settingsViewModel.onHealthProfileIntroShown() },
+                onGoToHealthProfile = {
+                    settingsViewModel.onHealthProfileIntroShown()
+                    onGoToHealthProfile()
+                }
             )
         }
 
