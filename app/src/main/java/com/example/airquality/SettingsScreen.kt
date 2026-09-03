@@ -326,9 +326,9 @@ private const val USER_GUIDE_TEXT =
     "- 新增常用地點，方便快速切換查詢。"
 
 // 隱私權政策完整版網頁（設定頁與首次同意彈窗都會連到這裡）
-// 註：政策檔案已改名為 repo 根目錄的 index.html，舊的 privacy_site/PrivacyPolicy.html 路徑會 404
+// 正式站台為 Vercel；GitHub Pages 那份路徑已失效，不要改回去
 internal const val PRIVACY_URL =
-    "https://yu-peihsuan.github.io/AirQuality-privacy-policy/"
+    "https://air-quality-privacy-policy.vercel.app/"
 
 // ── 個人健康檔案 Dialog ──────────────────────────────────────────────────────
 
