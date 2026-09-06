@@ -15,3 +15,4 @@
 local.properties
 
 .gradle-user-home/
+app/google-services.json
