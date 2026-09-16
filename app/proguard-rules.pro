@@ -68,3 +68,20 @@
     public static *** v(...);
     public static *** d(...);
 }
+
+# ── R8 full mode 下的 Retrofit 泛型簽章 ───────────────────────────────────────
+# AGP 8 起 android.enableR8.fullMode 預設開啟，R8 會剝掉「未被 keep 的型別」
+# 的泛型簽章。Retrofit 靠反射讀 suspend 函式的回傳型別來挑 converter，簽章一旦
+# 被剝掉，它拿到的是原始 Class 而不是 ParameterizedType，於是每個 API 呼叫都會
+# 拋出：java.lang.Class cannot be cast to java.lang.reflect.ParameterizedType
+#
+# Retrofit 2.9.0 尚未內建這組規則（2.10 起才隨函式庫附帶），因此在此補上。
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+
+# suspend 函式的回傳型別是藏在 Continuation 的泛型參數裡傳給 Retrofit 的
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+
+# 帶 @GET/@POST 等註解的介面，其回傳型別一律保留泛型資訊
+-if interface * { @retrofit2.http.* public *** *(...); }
+-keep,allowoptimization,allowshrinking,allowobfuscation class <3>
