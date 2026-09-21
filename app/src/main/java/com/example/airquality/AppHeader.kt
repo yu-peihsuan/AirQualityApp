@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,7 +85,6 @@ fun AppHeader(
 fun HomeAppHeader(
     location: String,
     date: String,
-    currentLocationName: String = "GPS 定位",
     unreadCount: Int = 0,
     onLocationSwitchClick: () -> Unit = {},
     onBellClick: () -> Unit = {}
@@ -111,7 +111,7 @@ fun HomeAppHeader(
 
             androidx.compose.foundation.Image(
                 painter = androidx.compose.ui.res.painterResource(id = R.drawable.location_add),
-                contentDescription = "常用地點",
+                contentDescription = stringResource(R.string.home_favorites_cd),
                 modifier = Modifier
                     .size(30.dp)
                     .clickable { onLocationSwitchClick() },

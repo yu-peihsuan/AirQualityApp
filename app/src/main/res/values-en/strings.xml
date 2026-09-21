@@ -1,0 +1,273 @@
+<resources>
+    <string name="app_name">AirQuality</string>
+
+    <!-- ── Common ─────────────────────────────────────────────────────── -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_close">Close</string>
+    <string name="action_confirm">OK</string>
+    <string name="action_add">+ Add</string>
+    <string name="privacy_policy">Privacy policy</string>
+
+    <!-- ── Bottom navigation ──────────────────────────────────────────── -->
+    <string name="nav_home">Home</string>
+    <string name="nav_ai">AI advisor</string>
+    <string name="nav_report">Report</string>
+    <string name="nav_notifications">Alerts</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- ── AQI levels ─────────────────────────────────────────────────── -->
+    <string name="aqi_level_good">Good</string>
+    <string name="aqi_level_moderate">Moderate</string>
+    <string name="aqi_level_unhealthy_sensitive">Unhealthy for sensitive groups</string>
+    <string name="aqi_level_unhealthy">Unhealthy</string>
+    <string name="aqi_level_very_unhealthy">Very unhealthy</string>
+    <string name="aqi_level_hazardous">Hazardous</string>
+    <string name="aqi_level_unhealthy_short">Unhealthy</string>
+
+    <!-- ── Wind ───────────────────────────────────────────────────────── -->
+    <string name="wind_calm">Calm</string>
+    <string name="wind_unknown">Unknown</string>
+    <string name="wind_n">a northerly</string>
+    <string name="wind_ne">a northeasterly</string>
+    <string name="wind_e">an easterly</string>
+    <string name="wind_se">a southeasterly</string>
+    <string name="wind_s">a southerly</string>
+    <string name="wind_sw">a southwesterly</string>
+    <string name="wind_w">a westerly</string>
+    <string name="wind_nw">a northwesterly</string>
+    <string name="compass_n">N</string>
+    <string name="compass_ne">NE</string>
+    <string name="compass_e">E</string>
+    <string name="compass_se">SE</string>
+    <string name="compass_s">S</string>
+    <string name="compass_sw">SW</string>
+    <string name="compass_w">W</string>
+    <string name="compass_nw">NW</string>
+
+    <!-- ── Incident types ─────────────────────────────────────────────── -->
+    <string name="event_fire">Fire / smoke</string>
+    <string name="event_chemical">Chemical odour</string>
+    <string name="event_dust">Dust</string>
+    <string name="event_odor">Odour</string>
+    <string name="event_vehicle">Vehicle exhaust</string>
+    <string name="event_factory">Factory emissions</string>
+    <string name="event_general">Poor air quality</string>
+    <string name="event_unknown_source">pollution source</string>
+    <string name="event_unknown_report">Pollution report</string>
+
+    <!-- ── Home ───────────────────────────────────────────────────────── -->
+    <string name="home_date_pattern">EEE, MMM d</string>
+    <string name="home_nearest_station">Nearest station: %1$s</string>
+    <string name="home_nearest_station_searching">Nearest station: searching…</string>
+    <string name="home_loading">Loading air quality data…</string>
+    <string name="home_cached_banner">⚠ No connection — showing cached data</string>
+    <!-- Followed by a coloured level word, e.g. "Air is Good" -->
+    <string name="home_air_prefix">"Air is "</string>
+    <string name="home_update_time">Updated %1$s</string>
+    <string name="home_aqi_badge">AQI %1$s %2$s</string>
+    <string name="home_toast_location_off">Location is off — pick a saved place</string>
+    <string name="home_toast_location_denied">Location denied — turn it on in system settings</string>
+    <string name="home_switch_location">Switch location</string>
+    <string name="home_no_favorites">No saved places yet. Tap “+ Add” at the top right to create one.</string>
+    <string name="home_favorites_cd">Saved places</string>
+
+    <!-- ── Places ─────────────────────────────────────────────────────── -->
+    <string name="location_gps">GPS location</string>
+    <string name="location_gps_subtitle">Detect where you are automatically</string>
+    <string name="location_current_marker">✓ Current</string>
+    <string name="location_add_title">Add a saved place</string>
+    <string name="location_edit_title">Edit place</string>
+    <string name="location_name_label">Name</string>
+    <string name="location_address_label">Address</string>
+    <string name="location_name_hint_short">e.g. Home, Office</string>
+    <string name="location_name_hint">e.g. Home, Office, Gym</string>
+    <string name="location_address_hint_full">e.g. No. 122, Sec. 1, Chongqing S. Rd., Taipei</string>
+    <string name="location_address_hint">e.g. Chongqing S. Rd., Zhongzheng Dist., Taipei</string>
+    <string name="location_fill_both">Enter both a name and an address</string>
+    <string name="location_save_and_switch">Save and switch</string>
+
+    <!-- ── Home action chips ──────────────────────────────────────────── -->
+    <string name="chip_indoor_exercise">Indoor workout</string>
+    <string name="chip_yoga">Yoga and stretching</string>
+    <string name="chip_ventilation">Open the windows</string>
+    <string name="chip_jogging">Go for a run</string>
+    <string name="chip_walking">Go for a walk</string>
+    <string name="chip_cycling">Go cycling</string>
+    <string name="chip_hydration">Drink water</string>
+    <string name="chip_hydration_more">Drink more water</string>
+    <string name="chip_air_purifier">Air purifier</string>
+    <string name="chip_mask">Wear a mask</string>
+    <string name="chip_close_window">Close doors and windows</string>
+    <string name="chip_go_out_less">Go out less</string>
+    <string name="chip_stay_inside">Stay indoors</string>
+    <string name="chip_public_transport">Take public transport</string>
+    <string name="chip_inhaler">Carry your inhaler</string>
+    <string name="chip_medicine">Keep meds to hand</string>
+
+    <!-- ── Home errors ────────────────────────────────────────────────── -->
+    <string name="home_error_geocode_fallback">Could not find “%1$s” (address search is unavailable) — showing Taipei data for now</string>
+    <string name="home_error_switch_location">Could not switch location</string>
+    <string name="home_error_aqi">Could not load AQI data</string>
+    <string name="home_error_with_reason">%1$s: %2$s</string>
+    <string name="home_current_position">Current location</string>
+
+    <!-- ── AI advisor ─────────────────────────────────────────────────── -->
+    <string name="ai_title">AI health advisor</string>
+    <string name="ai_section_advice">Personalised advice</string>
+    <string name="ai_placeholder_idle">Tap the button below to get personalised advice</string>
+    <string name="ai_loading">Looking at your health profile and the air right now…</string>
+    <string name="ai_advice_unavailable">No advice available right now. Please try again shortly.</string>
+    <string name="ai_aqi_caption">Air quality: %1$s (AQI %2$s)</string>
+    <string name="ai_refresh_cd">Refresh</string>
+    <string name="ai_refresh">Get new advice</string>
+    <string name="ai_error">Could not get AI advice: %1$s</string>
+    <string name="ai_warning_cd">Warning</string>
+    <string name="downwind_title">Downwind warning</string>
+    <string name="downwind_body">You are downwind of a “%1$s” pollution hotspot%2$s. %3$sPollutants may drift towards you, so take precautions.</string>
+    <string name="downwind_distance_suffix">" (about %1$s km away)"</string>
+    <string name="downwind_wind_prefix">"The wind is %1$s right now, so "</string>
+    <string name="ai_disclosure_title">Before we generate advice</string>
+    <string name="ai_disclosure_body">The AI advisor sends the age group and conditions from your health profile, together with your county and the current air quality, to this app\'s server, which passes them to a third-party AI service (OpenRouter) to write the advice.</string>
+    <string name="ai_disclosure_retention">This data is used only to generate that advice. It is not linked to your identity or kept afterwards.</string>
+    <string name="ai_disclosure_agree">Agree and get advice</string>
+
+    <!-- ── Reporting ──────────────────────────────────────────────────── -->
+    <string name="report_title">Report an incident</string>
+    <string name="report_section_location">Place</string>
+    <string name="report_location_hint">Enter an address or tap Locate</string>
+    <string name="report_locate">📍 Locate</string>
+    <string name="report_section_category">Incident type</string>
+    <string name="report_category_hint">Choose an incident type</string>
+    <string name="report_section_description">Description</string>
+    <string name="report_description_hint">Describe the air quality problem you noticed…</string>
+    <string name="report_submit">Send report</string>
+    <string name="report_location_denied">Location denied — enter the place by hand</string>
+    <string name="report_error_address">Could not resolve that address. Please enter it by hand.</string>
+    <string name="report_error_location">Cannot get your location right now. Try again or type the address.</string>
+    <string name="report_error_empty_fields">Please fill in every field</string>
+    <string name="report_error_submit">Could not send: %1$s</string>
+    <string name="report_success_confirmed">Confirmed as a pollution incident. Thanks for reporting!</string>
+    <string name="report_success">Report sent. Thank you.</string>
+    <string name="category_factory">Factory emissions</string>
+    <string name="category_vehicle">Vehicle exhaust</string>
+    <string name="category_open_burning">Open burning</string>
+    <string name="category_construction_dust">Construction dust</string>
+    <string name="category_fire_smoke">Fire smoke</string>
+    <string name="category_other">Other</string>
+
+    <!-- ── Alerts ─────────────────────────────────────────────────────── -->
+    <string name="notif_title">Alerts</string>
+    <string name="notif_map_cd">Hotspot map</string>
+    <string name="notif_empty">Nothing to report for your area right now.</string>
+    <string name="notif_disclaimer">Citizen reports come from other users and are unverified — treat them as a heads-up, not a fact.</string>
+    <string name="notif_group_fire">Fire alerts</string>
+    <string name="notif_group_report">Citizen reports</string>
+    <string name="notif_group_aqi">Air quality alerts</string>
+    <string name="notif_group_forecast">Forecast alerts</string>
+    <string name="notif_group_news">Recent news</string>
+    <plurals name="notif_item_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <string name="notif_fire_fallback_title">Major fire</string>
+    <string name="notif_region_nationwide">Taiwan</string>
+    <string name="notif_aqi_title">AQI %1$s (%2$s)</string>
+    <string name="notif_error">Could not load alerts: %1$s</string>
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes_ago">%1$d min ago</string>
+    <string name="time_hours_ago">%1$d h ago</string>
+    <string name="time_days_ago">%1$d d ago</string>
+
+    <!-- ── Hotspot map ────────────────────────────────────────────────── -->
+    <string name="map_title">Pollution map</string>
+    <string name="map_back">Back</string>
+    <string name="map_error">Could not load map data</string>
+    <string name="map_no_reports">No reports yet</string>
+    <string name="map_location_note">Location is off, so the map will not mark where you are. You can pick a saved place on the home screen instead.</string>
+    <string name="map_fire_alert_title">🔥 Major fire alert</string>
+    <string name="map_calm_wind">⚠ Poor dispersion (almost no wind)</string>
+    <string name="map_wind_info">Wind: %1$s at %2$s m/s</string>
+    <string name="map_hotspot_title">%1$s (%2$d reports)</string>
+    <string name="map_hotspot_snippet">Intensity %1$d%% · radius %2$s km | %3$s</string>
+    <string name="map_legend">Legend</string>
+    <string name="map_legend_fire_section">— Fire agency alerts</string>
+    <string name="map_legend_major_fire">Major fire</string>
+    <string name="map_legend_cluster_section">— Hotspot clusters</string>
+    <string name="map_legend_high" formatted="false">High ≥ 80%</string>
+    <string name="map_legend_mid" formatted="false">Medium ≥ 50%</string>
+    <string name="map_legend_low" formatted="false">Low &lt; 50%</string>
+    <string name="map_legend_calm">Poor dispersion (no wind)</string>
+    <string name="map_legend_report_section">— Individual reports</string>
+    <string name="map_legend_vehicle_factory">Vehicle / factory</string>
+
+    <!-- ── Settings ───────────────────────────────────────────────────── -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_notifications">Notifications</string>
+    <string name="settings_daily_description">Get one summary of your area\'s air quality every day, at a time you choose</string>
+    <string name="settings_daily_switch">Daily air quality notification</string>
+    <string name="settings_notify_time">Time</string>
+    <string name="settings_test_notification">🔔 Send a test notification</string>
+    <string name="settings_health_profile">Health profile</string>
+    <string name="settings_favorites">Saved places</string>
+    <string name="settings_user_guide">How to use this app</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_dialog_title">Choose a language</string>
+    <string name="language_system">Follow system</string>
+    <string name="language_zh">繁體中文</string>
+    <string name="language_en">English</string>
+    <string name="time_picker_title">Pick a time</string>
+    <string name="favorites_empty">No saved places yet</string>
+
+    <string name="settings_msg_daily_sync_failed">Notification setting did not sync: %1$s</string>
+    <string name="settings_msg_test_failed">⚠️ Could not send: %1$s</string>
+    <string name="settings_msg_sensitive_on">Health-based alerts are on. Your conditions will be used to target alerts.</string>
+    <string name="settings_msg_sensitive_off">Turned off. Your conditions have been deleted from the server.</string>
+    <string name="settings_msg_sync_failed">Setting did not sync: %1$s</string>
+    <string name="settings_msg_health_saved_local">✅ Health profile saved on this device</string>
+    <string name="settings_msg_health_saved_synced">✅ Health profile saved, alert targeting updated</string>
+    <string name="settings_msg_health_saved_sync_failed">✅ Saved on this device, but alert targeting did not sync: %1$s</string>
+
+    <!-- ── Health profile ─────────────────────────────────────────────── -->
+    <string name="health_dialog_title">Health profile</string>
+    <string name="health_dialog_description">This stays on your device and is what makes the AI advisor and the home screen suggestions fit your situation. When you ask for AI advice it is sent to the server to write that advice, and not kept.</string>
+    <string name="health_field_age">Age group</string>
+    <string name="health_field_conditions">Conditions and history</string>
+    <string name="health_field_other">Anything else</string>
+    <string name="health_other_hint">e.g. long-term medication, other conditions</string>
+    <string name="health_field_sensitive_alerts">Alerts based on your health</string>
+    <string name="health_sensitive_description">Turn this on and the details above are sent to and stored on the server, so it can warn you first when the air gets worse. Turning it off deletes them from the server.</string>
+    <string name="health_switch_on">On</string>
+    <string name="health_switch_off">Off</string>
+    <string name="age_under_18">Under 18</string>
+    <string name="age_18_64">18–64</string>
+    <string name="age_65_plus">65 and over</string>
+    <string name="condition_asthma">Asthma</string>
+    <string name="condition_cardiovascular">Cardiovascular disease</string>
+    <string name="condition_pregnant">Pregnant</string>
+    <string name="condition_allergy">Allergies</string>
+    <string name="condition_respiratory">Respiratory disease</string>
+    <string name="condition_hypertension">High blood pressure</string>
+
+    <!-- ── First-run explainer ────────────────────────────────────────── -->
+    <string name="intro_title">Why we ask about your health</string>
+    <string name="intro_body_1">The same air does not affect everyone equally — asthma, heart conditions, pregnancy, older age and young children all change the picture.</string>
+    <string name="intro_body_2">Once you fill in your age group and any conditions, the AI advisor tailors its advice to you, and the suggestions on the home screen follow suit.</string>
+    <string name="intro_body_3">By default this stays on your device only, and you can change or clear it at any time.</string>
+    <string name="intro_fill_now">Fill it in</string>
+    <string name="intro_later">Maybe later</string>
+
+    <!-- ── User guide ─────────────────────────────────────────────────── -->
+    <string name="user_guide_text">This app gives you live air quality data for Taiwan along with personal health guidance. Here is what each screen does:\n\n1. Home\n- The live AQI and air quality level from the station nearest to you.\n- Tap the icon at the top right to switch between GPS location and your saved places.\n\n2. AI advisor\n- Personal health advice based on your health profile and the air right now.\n\n3. Report (the orange button in the middle)\n- Spotted a fire, an odour or dust? File a report with the place and a description.\n\n4. Alerts\n- Forecasts, warnings and reports filed by people near you.\n- Tap the map icon at the top right for official fire alerts and a hotspot map.\n\n5. Settings\n- Turn the daily air quality notification on or off and choose when it arrives.\n- Edit your health profile (kept on this device by default) and decide whether the server may use it to warn you first.\n- Add saved places so you can switch between them quickly.\n- Switch the app language (繁體中文 / English).</string>
+
+    <!-- ── Push notifications ─────────────────────────────────────────── -->
+    <string name="notification_channel_name">Air quality alerts</string>
+    <string name="notification_default_title">Air quality alert</string>
+    <string name="fcm_error_no_token">Push ID is not ready yet</string>
+    <string name="fcm_error_no_token_retry">Push ID is not ready yet. Please try again shortly.</string>
+    <string name="fcm_error_connection">Connection failed</string>
+    <string name="fcm_error_rejected">The server did not accept this setting</string>
+    <string name="fcm_error_send">Could not send</string>
+    <string name="fcm_test_sent">✅ Test notification sent (%1$s AQI %2$s)</string>
+</resources>

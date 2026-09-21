@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.airquality.data.AirQualityRepository
 import com.example.airquality.data.AppContainer
+import com.example.airquality.data.Localizer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,7 +25,8 @@ sealed class NotificationUiState {
 }
 
 class NotificationViewModel(
-    private val airQuality: AirQualityRepository = AppContainer.airQuality
+    private val airQuality: AirQualityRepository = AppContainer.airQuality,
+    private val localizer: Localizer = AppContainer.localizer
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<NotificationUiState>(NotificationUiState.Loading)
     val uiState: StateFlow<NotificationUiState> = _uiState.asStateFlow()
@@ -57,10 +59,13 @@ class NotificationViewModel(
                     .maxByOrNull { it.aqi.toIntOrNull() ?: 0 }
                 val aqiValue = maxAqi?.aqi?.toIntOrNull() ?: 0
                 if (aqiValue >= 151) {
+                    val levelLabel = localizer.string(
+                        AqiLevel.of(maxAqi?.status ?: "", aqiValue).labelRes
+                    )
                     aqiAlerts += NewsRecord(
-                        source     = "空氣品質警報",
-                        region     = regionParam ?: "全台",
-                        title      = "AQI $aqiValue（${maxAqi?.status ?: ""}）",
+                        source     = localizer.string(R.string.notif_group_aqi),
+                        region     = regionParam ?: localizer.string(R.string.notif_region_nationwide),
+                        title      = localizer.string(R.string.notif_aqi_title, aqiValue.toString(), levelLabel),
                         summary    = "${maxAqi?.county ?: ""}${maxAqi?.sitename ?: ""}",
                         url        = "",
                         publishedAt = maxAqi?.publishtime ?: "",
@@ -89,7 +94,9 @@ class NotificationViewModel(
 
                 _uiState.value = NotificationUiState.Success(sections)
             } catch (e: Exception) {
-                _uiState.value = NotificationUiState.Error("通知資料取得失敗: ${e.localizedMessage}")
+                _uiState.value = NotificationUiState.Error(
+                    localizer.string(R.string.notif_error, e.localizedMessage ?: "")
+                )
                 Log.e("NotificationViewModel", "fetchNotifications failed", e)
             }
         }

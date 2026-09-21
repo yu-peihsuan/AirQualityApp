@@ -12,9 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.annotation.StringRes
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airquality.ui.theme.*
 import kotlinx.coroutines.launch
@@ -28,7 +30,11 @@ fun ReportScreen(
     var description by remember { mutableStateOf("") }
     var expanded    by remember { mutableStateOf(false) }
     var category    by remember { mutableStateOf("") }
-    val categories  = listOf("工廠排放", "車輛廢氣", "露天燃燒", "建築揚塵", "火災煙霧", "其他")
+    // value 是送到後端的正規值（固定中文，回報資料庫與 LLM 結構化都按這個比對），
+    // 介面上顯示的是 labelRes。
+    val categories = REPORT_CATEGORIES
+
+    val permissionDeniedMessage = stringResource(R.string.report_location_denied)
 
     val uiState by reportViewModel.uiState.collectAsState()
     val locationFetchState by reportViewModel.locationFetchState.collectAsState()
@@ -40,7 +46,7 @@ fun ReportScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) reportViewModel.fetchAddressFromGps()
-        else scope.launch { snackbarHostState.showSnackbar("未取得定位權限，請手動輸入地點") }
+        else scope.launch { snackbarHostState.showSnackbar(permissionDeniedMessage) }
     }
 
     // 進入畫面時：若有手動選擇地點則用該座標填入，否則用 GPS。
@@ -102,7 +108,7 @@ fun ReportScreen(
                 .background(BgMain)
         ) {
             // ── Header ──────────────────────────────────────────────────────────
-            AppHeader(title = "事件通報")
+            AppHeader(title = stringResource(R.string.report_title))
 
             // ── 主內容 (scrollable) ─────────────────────────────────────────────
             Column(
@@ -114,7 +120,7 @@ fun ReportScreen(
                 Spacer(Modifier.height(8.dp))
 
                 // ── 位置 ──────────────────────────────────────────
-                SectionLabel("位置")
+                SectionLabel(stringResource(R.string.report_section_location))
                 Spacer(Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -126,7 +132,7 @@ fun ReportScreen(
                         onValueChange = { location = it },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        placeholder = { Text("輸入地址或點擊定位", color = TextGray) },
+                        placeholder = { Text(stringResource(R.string.report_location_hint), color = TextGray) },
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedContainerColor = CardWhite,
                             focusedContainerColor   = CardWhite,
@@ -151,7 +157,7 @@ fun ReportScreen(
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Text("📍 定位", fontSize = 14.sp)
+                            Text(stringResource(R.string.report_locate), fontSize = 14.sp)
                         }
                     }
                 }
@@ -159,11 +165,13 @@ fun ReportScreen(
                 Spacer(Modifier.height(16.dp))
 
                 // ── 事件類別下拉 ──────────────────────────────────
-                SectionLabel("事件類別")
+                SectionLabel(stringResource(R.string.report_section_category))
                 Spacer(Modifier.height(6.dp))
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                     OutlinedTextField(
-                        value = category.ifEmpty { "請選擇事件類別" },
+                        value = categories.firstOrNull { it.value == category }
+                            ?.let { stringResource(it.labelRes) }
+                            ?: stringResource(R.string.report_category_hint),
                         onValueChange = {},
                         readOnly = true,
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
@@ -179,8 +187,8 @@ fun ReportScreen(
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         categories.forEach { item ->
                             DropdownMenuItem(
-                                text = { Text(item) },
-                                onClick = { category = item; expanded = false }
+                                text = { Text(stringResource(item.labelRes)) },
+                                onClick = { category = item.value; expanded = false }
                             )
                         }
                     }
@@ -189,14 +197,14 @@ fun ReportScreen(
                 Spacer(Modifier.height(16.dp))
 
                 // ── 簡易描述 ──────────────────────────────────────
-                SectionLabel("簡易描述")
+                SectionLabel(stringResource(R.string.report_section_description))
                 Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     modifier = Modifier.fillMaxWidth().height(120.dp),
                     shape = RoundedCornerShape(12.dp),
-                    placeholder = { Text("請描述您觀察到的空氣品質問題…", color = TextGray) },
+                    placeholder = { Text(stringResource(R.string.report_description_hint), color = TextGray) },
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedContainerColor = CardWhite,
                         focusedContainerColor   = CardWhite,
@@ -219,7 +227,7 @@ fun ReportScreen(
                         enabled = !isLoading,
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = RoundedCornerShape(12.dp)
-                    ) { Text("取消", color = TextMid) }
+                    ) { Text(stringResource(R.string.action_cancel), color = TextMid) }
 
                     Button(
                         onClick = { reportViewModel.submitReport(location, category, description) },
@@ -237,7 +245,7 @@ fun ReportScreen(
                         } else {
                             Text("📤", fontSize = 19.sp)
                             Spacer(Modifier.width(6.dp))
-                            Text("立即通報", fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.report_submit), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -253,3 +261,18 @@ fun coroutineScope() = rememberCoroutineScope()
 fun SectionLabel(text: String) {
     Text(text, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = TextMid)
 }
+
+/**
+ * 回報類別。[value] 是送給後端的正規值，一律維持中文——它是資料不是文案，
+ * 翻譯它會讓已經存在資料庫裡的回報分類對不起來。
+ */
+data class ReportCategory(val value: String, @StringRes val labelRes: Int)
+
+private val REPORT_CATEGORIES = listOf(
+    ReportCategory("工廠排放", R.string.category_factory),
+    ReportCategory("車輛廢氣", R.string.category_vehicle),
+    ReportCategory("露天燃燒", R.string.category_open_burning),
+    ReportCategory("建築揚塵", R.string.category_construction_dust),
+    ReportCategory("火災煙霧", R.string.category_fire_smoke),
+    ReportCategory("其他",     R.string.category_other),
+)

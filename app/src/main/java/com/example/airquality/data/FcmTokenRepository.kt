@@ -6,6 +6,7 @@ import com.example.airquality.AirQualityApiService
 import com.example.airquality.DailyNotificationRequest
 import com.example.airquality.DailyNotificationTestRequest
 import com.example.airquality.FcmTokenRequest
+import com.example.airquality.R
 import com.example.airquality.RetrofitClient
 import com.google.firebase.messaging.FirebaseMessaging
 
@@ -24,6 +25,9 @@ open class FcmTokenRepository(
 ) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    // 這裡回的 SyncResult/Result 訊息會直接進 Snackbar，所以要跟著介面語言走
+    private val localizer = Localizer(context.applicationContext)
 
     open fun token(): String? = prefs.getString(KEY_TOKEN, null)
 
@@ -64,7 +68,7 @@ open class FcmTokenRepository(
         county: String = "",
         coordinates: Coordinates? = null
     ): SyncResult {
-        val token = token() ?: return SyncResult.Failure("尚未取得推播識別碼")
+        val token = token() ?: return SyncResult.Failure(localizer.string(R.string.fcm_error_no_token))
         val effectiveCounty = county.ifBlank { lastKnownCounty() }
         val effectiveCoords = coordinates ?: lastKnownCoordinates()
         val conditions =
@@ -89,34 +93,40 @@ open class FcmTokenRepository(
             SyncResult.Success
         } catch (e: Exception) {
             Log.w(TAG, "推播註冊失敗：${e.message}")
-            SyncResult.Failure(e.localizedMessage ?: "連線失敗")
+            SyncResult.Failure(e.localizedMessage ?: localizer.string(R.string.fcm_error_connection))
         }
     }
 
     /** 設定或取消每日空氣品質摘要推播。 */
     open suspend fun setDailyNotification(enabled: Boolean, hour: Int, minute: Int): SyncResult {
-        val token = token() ?: return SyncResult.Failure("尚未取得推播識別碼，請稍後再試")
+        val token = token() ?: return SyncResult.Failure(localizer.string(R.string.fcm_error_no_token_retry))
         return try {
             val response = api.setDailyNotification(
                 DailyNotificationRequest(token = token, enabled = enabled, hour = hour, minute = minute)
             )
             if (response.status == "success") SyncResult.Success
-            else SyncResult.Failure(response.message ?: "後端未接受這次設定")
+            else SyncResult.Failure(response.message ?: localizer.string(R.string.fcm_error_rejected))
         } catch (e: Exception) {
-            SyncResult.Failure(e.localizedMessage ?: "連線失敗")
+            SyncResult.Failure(e.localizedMessage ?: localizer.string(R.string.fcm_error_connection))
         }
     }
 
     /** 立刻推一則測試通知；成功時回傳給使用者看的描述。 */
     open suspend fun sendTestNotification(): Result<String> {
         val token = token()
-            ?: return Result.failure(IllegalStateException("尚未取得推播識別碼，請稍後再試"))
+            ?: return Result.failure(IllegalStateException(localizer.string(R.string.fcm_error_no_token_retry)))
         return try {
             val response = api.testDailyNotification(DailyNotificationTestRequest(token = token))
             if (response.status == "success") {
-                Result.success("✅ 測試通知已發送（${response.county} AQI ${response.aqi}）")
+                Result.success(
+                    localizer.string(
+                        R.string.fcm_test_sent,
+                        response.county ?: "",
+                        response.aqi?.toString() ?: "-"
+                    )
+                )
             } else {
-                Result.failure(IllegalStateException(response.message ?: "發送失敗"))
+                Result.failure(IllegalStateException(response.message ?: localizer.string(R.string.fcm_error_send)))
             }
         } catch (e: Exception) {
             Result.failure(e)

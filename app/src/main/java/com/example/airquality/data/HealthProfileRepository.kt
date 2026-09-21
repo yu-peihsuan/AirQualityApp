@@ -53,14 +53,16 @@ open class HealthProfileRepository(context: Context) {
         val label = ageGroup
         return RagUserProfile(
             ageGroup = when {
-                label.contains("18歲以下") -> "child"
-                label.contains("65")      -> "elderly"
-                else                      -> "adult"
+                label.contains(HealthOptions.AGE_UNDER_18) -> "child"
+                label.contains("65")                       -> "elderly"
+                else                                       -> "adult"
             },
-            isPregnant        = conds.contains("懷孕中"),
-            hasAsthma         = conds.contains("氣喘") || conds.contains("呼吸道疾病"),
-            hasCardiovascular = conds.contains("心血管疾病") || conds.contains("高血壓"),
-            hasAllergy        = conds.contains("過敏"),
+            isPregnant        = conds.contains(HealthOptions.PREGNANT),
+            hasAsthma         = conds.contains(HealthOptions.ASTHMA) ||
+                                conds.contains(HealthOptions.RESPIRATORY),
+            hasCardiovascular = conds.contains(HealthOptions.CARDIOVASCULAR) ||
+                                conds.contains(HealthOptions.HYPERTENSION),
+            hasAllergy        = conds.contains(HealthOptions.ALLERGY),
             otherNotes        = otherNotes.ifBlank { null }
         )
     }
@@ -73,8 +75,8 @@ open class HealthProfileRepository(context: Context) {
         val label = ageGroup
         return buildString {
             conditions.forEach { append(",").append(it) }
-            if (label.contains("18歲以下")) append(",18歲以下")
-            if (label.contains("65"))      append(",65歲以上")
+            if (label.contains(HealthOptions.AGE_UNDER_18)) append(",").append(HealthOptions.AGE_UNDER_18)
+            if (label.contains("65"))                       append(",").append(HealthOptions.AGE_65_PLUS)
         }.trimStart(',')
     }
 
@@ -84,6 +86,6 @@ open class HealthProfileRepository(context: Context) {
         const val KEY_CONDITIONS = "health_conditions"
         const val KEY_OTHER = "health_other"
         const val KEY_AI_CONSENT = "ai_sharing_consented"
-        const val DEFAULT_AGE_GROUP = "18-64歲"
+        const val DEFAULT_AGE_GROUP = HealthOptions.AGE_18_64
     }
 }

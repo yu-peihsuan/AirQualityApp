@@ -12,11 +12,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.app.Activity
+import androidx.annotation.StringRes
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.airquality.data.AppLanguage
 import com.example.airquality.data.FavoriteLocation
+import com.example.airquality.data.HealthOptions
 import com.example.airquality.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +75,10 @@ fun SettingsScreen(
     // ── 使用說明 ──────────────────────────────────────────────────────────
     var showGuideDialog by remember { mutableStateOf(false) }
 
+    // 介面語言
+    val language by viewModel.language.collectAsState()
+    var showLanguageDialog by remember { mutableStateOf(false) }
+
     // ── Snackbar ──────────────────────────────────────────────────────────
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -89,7 +98,7 @@ fun SettingsScreen(
                 .background(BgMain)
         ) {
             // ── Header ────────────────────────────────────────────────────
-            AppHeader(title = "設定")
+            AppHeader(title = stringResource(R.string.settings_title))
 
             // ── 主內容（可捲動：小螢幕或字體放大時，下方項目才不會被切掉）──
             Column(
@@ -101,14 +110,14 @@ fun SettingsScreen(
                 Spacer(Modifier.height(24.dp))
 
                 // ── 通知設定（常用，直接顯示）───────────────────────────
-                SettingSection("通知設定") {
+                SettingSection(stringResource(R.string.settings_section_notifications)) {
                     Text(
-                        "開啟後，每天會在你指定的時間收到一次所在地區的空氣品質摘要通知",
+                        stringResource(R.string.settings_daily_description),
                         color = TextGray, fontSize = 13.sp,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     SettingSwitchRow(
-                        label = "每日空氣品質通知",
+                        label = stringResource(R.string.settings_daily_switch),
                         checked = dailyNotificationEnabled,
                         onCheckedChange = { viewModel.setDailyEnabled(it) }
                     )
@@ -122,7 +131,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("通知時間", color = TextDark, fontSize = 16.sp)
+                            Text(stringResource(R.string.settings_notify_time), color = TextDark, fontSize = 16.sp)
                             Text(
                                 "%02d:%02d".format(dailyHour, dailyMinute),
                                 color = OrangeMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold
@@ -139,20 +148,25 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeMain)
                 ) {
-                    Text("🔔 發送測試通知", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.settings_test_notification), fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
 
                 Spacer(Modifier.height(20.dp))
 
                 // ── 其他設定：點開才顯示詳細內容 ─────────────────────────
                 SettingSection(title = null) {
-                    SettingLinkRow("個人健康檔案") { showHealthDialog = true }
+                    SettingLinkRow(stringResource(R.string.settings_health_profile)) { showHealthDialog = true }
                     HorizontalDivider(color = DividerColor)
-                    SettingLinkRow("常用地點") { showLocationsDialog = true }
+                    SettingLinkRow(stringResource(R.string.settings_favorites)) { showLocationsDialog = true }
                     HorizontalDivider(color = DividerColor)
-                    SettingLinkRow("使用說明") { showGuideDialog = true }
+                    SettingLinkRow(
+                        label = stringResource(R.string.settings_language),
+                        value = stringResource(language.labelRes)
+                    ) { showLanguageDialog = true }
                     HorizontalDivider(color = DividerColor)
-                    SettingLinkRow("隱私權政策") {
+                    SettingLinkRow(stringResource(R.string.settings_user_guide)) { showGuideDialog = true }
+                    HorizontalDivider(color = DividerColor)
+                    SettingLinkRow(stringResource(R.string.privacy_policy)) {
                         context.startActivity(
                             android.content.Intent(
                                 android.content.Intent.ACTION_VIEW,
@@ -212,16 +226,22 @@ fun SettingsScreen(
             onDismissRequest = { editingIndex = null },
             containerColor = BgMain,
             title = {
-                Text(if (isNew) "新增常用地點" else "編輯地點",
-                    fontWeight = FontWeight.Bold, color = TextDark)
+                Text(
+                    stringResource(
+                        if (isNew) R.string.location_add_title else R.string.location_edit_title
+                    ),
+                    fontWeight = FontWeight.Bold, color = TextDark
+                )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = editName,
                         onValueChange = { editName = it },
-                        label = { Text("名稱") },
-                        placeholder = { Text("例如：家、公司、健身房", color = TextGray, fontSize = 13.sp) },
+                        label = { Text(stringResource(R.string.location_name_label)) },
+                        placeholder = {
+                            Text(stringResource(R.string.location_name_hint), color = TextGray, fontSize = 13.sp)
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         colors = healthTextFieldColors(),
@@ -230,8 +250,10 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = editAddress,
                         onValueChange = { editAddress = it },
-                        label = { Text("地址") },
-                        placeholder = { Text("例如：台北市中正區重慶南路", color = TextGray, fontSize = 13.sp) },
+                        label = { Text(stringResource(R.string.location_address_label)) },
+                        placeholder = {
+                            Text(stringResource(R.string.location_address_hint), color = TextGray, fontSize = 13.sp)
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         colors = healthTextFieldColors(),
@@ -247,7 +269,7 @@ fun SettingsScreen(
                     else favLocations[i] = newFav
                     viewModel.saveFavorites(favLocations.toList())
                     editingIndex = null
-                }) { Text("儲存", color = OrangeMain) }
+                }) { Text(stringResource(R.string.action_save), color = OrangeMain) }
             },
             dismissButton = {
                 Row {
@@ -257,10 +279,10 @@ fun SettingsScreen(
                             favLocations.removeAt(i)
                             viewModel.saveFavorites(favLocations.toList())
                             editingIndex = null
-                        }) { Text("刪除", color = RedText) }
+                        }) { Text(stringResource(R.string.action_delete), color = RedText) }
                     }
                     TextButton(onClick = { editingIndex = null }) {
-                        Text("取消", color = TextGray)
+                        Text(stringResource(R.string.action_cancel), color = TextGray)
                     }
                 }
             }
@@ -281,8 +303,77 @@ fun SettingsScreen(
 
     // ── 使用說明 彈跳視窗 ──────────────────────────────────────────────────
     if (showGuideDialog) {
-        InfoDialog("使用說明", USER_GUIDE_TEXT) { showGuideDialog = false }
+        InfoDialog(
+            stringResource(R.string.settings_user_guide),
+            stringResource(R.string.user_guide_text)
+        ) { showGuideDialog = false }
     }
+
+    // ── 語言選單 ───────────────────────────────────────────────
+    if (showLanguageDialog) {
+        LanguageDialog(
+            current = language,
+            onDismiss = { showLanguageDialog = false },
+            onSelect = { picked ->
+                showLanguageDialog = false
+                if (picked != language) {
+                    viewModel.setLanguage(picked)
+                    // 資源要重新解析才會換語系，而 Context 是在
+                    // MainActivity.attachBaseContext 時包的，所以要整個 Activity 重建。
+                    (context as? Activity)?.recreate()
+                }
+            }
+        )
+    }
+}
+
+// ── 語言選單 Dialog ─────────────────────────────────────────
+
+@Composable
+private fun LanguageDialog(
+    current: AppLanguage,
+    onDismiss: () -> Unit,
+    onSelect: (AppLanguage) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = BgMain,
+        title = {
+            Text(
+                stringResource(R.string.settings_language_dialog_title),
+                fontWeight = FontWeight.Bold, color = TextDark
+            )
+        },
+        text = {
+            Column {
+                AppLanguage.entries.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(option) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = option == current,
+                            onClick = { onSelect(option) },
+                            colors = RadioButtonDefaults.colors(selectedColor = OrangeMain)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            stringResource(option.labelRes),
+                            color = TextDark, fontSize = 16.sp
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel), color = TextGray)
+            }
+        }
+    )
 }
 
 // ── 可捲動說明對話框（使用說明／隱私權政策共用）──────────────────────────────────
@@ -302,28 +393,10 @@ private fun InfoDialog(title: String, content: String, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("關閉", color = OrangeMain) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close), color = OrangeMain) }
         }
     )
 }
-
-private const val USER_GUIDE_TEXT =
-    "本App提供台灣即時空氣品質資訊與個人化健康防護，主要功能如下：\n\n" +
-    "1. 首頁\n" +
-    "- 顯示所在地區最近測站的即時 AQI 與空氣品質等級。\n" +
-    "- 點右上角圖示可切換「GPS 定位」或你設定的常用地點。\n\n" +
-    "2. AI 顧問\n" +
-    "- 依你的健康檔案與當前空品，提供個人化健康建議。\n\n" +
-    "3. 通報（中間橘色按鈕）\n" +
-    "- 發現火災、異味、揚塵等空污事件，可填寫地點與描述向社群通報。\n\n" +
-    "4. 通知中心\n" +
-    "- 查看空品預報、警報，以及附近的民眾回報。\n" +
-    "- 點右上角地圖圖示，可看官方火災警示與回報熱點地圖。\n\n" +
-    "5. 設定\n" +
-    "- 開關每日空氣品質通知並設定推播時間。\n" +
-
-    "- 編輯個人健康檔案（預設僅儲存於本機），並可決定是否讓伺服器依你的健康狀況優先發送警示。\n" +
-    "- 新增常用地點，方便快速切換查詢。"
 
 // 隱私權政策完整版網頁（設定頁與首次同意彈窗都會連到這裡）
 // 正式站台為 Vercel；GitHub Pages 那份路徑已失效，不要改回去
@@ -345,13 +418,15 @@ private fun HealthProfileDialog(
     onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
-    val ageGroups     = listOf("18歲以下", "18-64歲", "65歲以上")
-    val conditionList = listOf("氣喘", "心血管疾病", "懷孕中", "過敏", "呼吸道疾病", "高血壓")
+    val ageGroups     = HealthOptions.ageGroups
+    val conditionList = HealthOptions.conditions
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = BgMain,
-        title = { Text("個人健康檔案", fontWeight = FontWeight.Bold, color = TextDark) },
+        title = {
+            Text(stringResource(R.string.health_dialog_title), fontWeight = FontWeight.Bold, color = TextDark)
+        },
         text = {
             // 可捲動：小螢幕或系統字體放大時，內容超出對話框高度仍可完整檢視
             Column(
@@ -360,17 +435,16 @@ private fun HealthProfileDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    "這份資料儲存於你的裝置，用來讓 AI 顧問與首頁建議更貼近你的情況。" +
-                        "使用 AI 建議時會即時傳送至伺服器生成建議，不會保存。",
+                    stringResource(R.string.health_dialog_description),
                     color = TextGray, fontSize = 12.sp, lineHeight = 18.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-                HealthFieldLabel("年齡層")
+                HealthFieldLabel(stringResource(R.string.health_field_age))
                 SingleSelectChipRow(ageGroups, selectedAgeGroup, onAgeGroupChange)
 
                 Spacer(Modifier.height(16.dp))
 
-                HealthFieldLabel("生理狀態與病史")
+                HealthFieldLabel(stringResource(R.string.health_field_conditions))
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -378,14 +452,14 @@ private fun HealthProfileDialog(
                 ) {
                     conditionList.forEach { condition ->
                         FilterChip(
-                            selected = selectedConditions.contains(condition),
+                            selected = selectedConditions.contains(condition.value),
                             onClick = {
-                                if (selectedConditions.contains(condition))
-                                    selectedConditions.remove(condition)
+                                if (selectedConditions.contains(condition.value))
+                                    selectedConditions.remove(condition.value)
                                 else
-                                    selectedConditions.add(condition)
+                                    selectedConditions.add(condition.value)
                             },
-                            label = { Text(condition, fontSize = 13.sp) },
+                            label = { Text(stringResource(condition.labelRes), fontSize = 13.sp) },
                             colors = healthChipColors()
                         )
                     }
@@ -393,13 +467,15 @@ private fun HealthProfileDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                HealthFieldLabel("其他說明")
+                HealthFieldLabel(stringResource(R.string.health_field_other))
                 OutlinedTextField(
                     value = otherText,
                     onValueChange = onOtherTextChange,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
-                    placeholder = { Text("如長期服用藥物、特殊病史等", color = TextGray, fontSize = 14.sp) },
+                    placeholder = {
+                        Text(stringResource(R.string.health_other_hint), color = TextGray, fontSize = 14.sp)
+                    },
                     colors = healthTextFieldColors(),
                     minLines = 2,
                     maxLines = 4
@@ -411,25 +487,26 @@ private fun HealthProfileDialog(
 
                 // 把健康屬性送到伺服器的明確同意就在這裡——使用者一邊看著自己
                 // 填的病史、一邊決定要不要分享，比在開場的彈窗上按同意有意義。
-                HealthFieldLabel("依健康狀況發送警示")
+                HealthFieldLabel(stringResource(R.string.health_field_sensitive_alerts))
                 Text(
-                    "開啟後，以上資料會傳送並保存於伺服器，" +
-                        "讓空氣品質變差時能優先提醒你。關閉時伺服器會一併刪除。",
+                    stringResource(R.string.health_sensitive_description),
                     color = TextGray, fontSize = 12.sp, lineHeight = 18.sp,
                     modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
                 )
                 SettingSwitchRow(
-                    label = if (sensitiveAlertsEnabled) "已開啟" else "未開啟",
+                    label = stringResource(
+                        if (sensitiveAlertsEnabled) R.string.health_switch_on else R.string.health_switch_off
+                    ),
                     checked = sensitiveAlertsEnabled,
                     onCheckedChange = onSensitiveAlertsChange
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onSave) { Text("儲存", color = OrangeMain) }
+            TextButton(onClick = onSave) { Text(stringResource(R.string.action_save), color = OrangeMain) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消", color = TextGray) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = TextGray) }
         }
     )
 }
@@ -452,9 +529,9 @@ private fun LocationsDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("常用地點", fontWeight = FontWeight.Bold, color = TextDark)
+                Text(stringResource(R.string.settings_favorites), fontWeight = FontWeight.Bold, color = TextDark)
                 TextButton(onClick = onAddClick) {
-                    Text("＋ 新增", color = OrangeMain, fontSize = 14.sp)
+                    Text(stringResource(R.string.action_add), color = OrangeMain, fontSize = 14.sp)
                 }
             }
         },
@@ -462,7 +539,7 @@ private fun LocationsDialog(
             val filled = favLocations.filter { it.name.isNotEmpty() && it.address.isNotEmpty() }
             if (filled.isEmpty()) {
                 Text(
-                    "尚未新增常用地點",
+                    stringResource(R.string.favorites_empty),
                     color = TextGray, fontSize = 14.sp,
                     modifier = Modifier.padding(vertical = 14.dp)
                 )
@@ -493,7 +570,7 @@ private fun LocationsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("關閉", color = OrangeMain) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close), color = OrangeMain) }
         }
     )
 }
@@ -514,7 +591,7 @@ private fun HealthFieldLabel(text: String) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SingleSelectChipRow(
-    options: List<String>,
+    options: List<com.example.airquality.data.HealthOption>,
     selected: String,
     onSelect: (String) -> Unit
 ) {
@@ -525,9 +602,9 @@ private fun SingleSelectChipRow(
     ) {
         options.forEach { opt ->
             FilterChip(
-                selected = selected == opt,
-                onClick  = { onSelect(opt) },
-                label    = { Text(opt, fontSize = 13.sp) },
+                selected = selected == opt.value,
+                onClick  = { onSelect(opt.value) },
+                label    = { Text(stringResource(opt.labelRes), fontSize = 13.sp) },
                 colors   = healthChipColors()
             )
         }
@@ -557,15 +634,17 @@ private fun DailyNotificationTimePickerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = BgMain,
-        title = { Text("選擇通知時間", fontWeight = FontWeight.Bold, color = TextDark) },
+        title = {
+            Text(stringResource(R.string.time_picker_title), fontWeight = FontWeight.Bold, color = TextDark)
+        },
         text = { TimePicker(state = state) },
         confirmButton = {
             TextButton(onClick = { onConfirm(state.hour, state.minute) }) {
-                Text("確定", color = OrangeMain)
+                Text(stringResource(R.string.action_confirm), color = OrangeMain)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消", color = TextGray) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = TextGray) }
         }
     )
 }
@@ -597,8 +676,9 @@ fun SettingSection(title: String?, content: @Composable ColumnScope.() -> Unit) 
     )
 }
 
+/** [value] 是右側的現値（例如語言列要顯示目前選的語言），不給就只有箭頭。 */
 @Composable
-fun SettingLinkRow(label: String, onClick: () -> Unit) {
+fun SettingLinkRow(label: String, value: String? = null, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -608,7 +688,13 @@ fun SettingLinkRow(label: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, color = TextDark, fontSize = 17.sp)
-        Text("›", color = TextGray, fontSize = 23.sp, fontWeight = FontWeight.Light)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (value != null) {
+                Text(value, color = TextGray, fontSize = 15.sp)
+                Spacer(Modifier.width(6.dp))
+            }
+            Text("›", color = TextGray, fontSize = 23.sp, fontWeight = FontWeight.Light)
+        }
     }
 }
 

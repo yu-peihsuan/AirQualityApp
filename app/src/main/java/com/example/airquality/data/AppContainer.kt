@@ -30,6 +30,10 @@ object AppContainer {
     lateinit var locationPreference: LocationPreferenceRepository
         private set
 
+    /** 畫面之外（ViewModel／Repository／FCM Service）取用字串資源的入口。 */
+    lateinit var localizer: Localizer
+        private set
+
     fun init(context: Context) {
         val app = context.applicationContext
         airQuality           = AirQualityRepository()
@@ -39,5 +43,6 @@ object AppContainer {
         notificationSettings = NotificationSettingsRepository(app)
         fcmToken             = FcmTokenRepository(app, healthProfile, notificationSettings)
         locationPreference   = LocationPreferenceRepository(app)
+        localizer            = Localizer(app)
     }
 }

@@ -1,3 +1,279 @@
 <resources>
+    <!--
+      預設語系是繁體中文：這個 App 的主要使用者在台灣，任何比對不到的語系
+      退回中文比退回英文合理。英文版放在 values-en/。
+    -->
     <string name="app_name">AirQuality</string>
+
+    <!-- ── 通用 ───────────────────────────────────────────────────────── -->
+    <string name="action_save">儲存</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_delete">刪除</string>
+    <string name="action_close">關閉</string>
+    <string name="action_confirm">確定</string>
+    <string name="action_add">＋ 新增</string>
+    <string name="privacy_policy">隱私權政策</string>
+
+    <!-- ── 底部導覽 ───────────────────────────────────────────────────── -->
+    <string name="nav_home">首頁</string>
+    <string name="nav_ai">AI顧問</string>
+    <string name="nav_report">通報</string>
+    <string name="nav_notifications">通知</string>
+    <string name="nav_settings">設定</string>
+
+    <!-- ── AQI 等級 ───────────────────────────────────────────────────── -->
+    <string name="aqi_level_good">良好</string>
+    <string name="aqi_level_moderate">普通</string>
+    <string name="aqi_level_unhealthy_sensitive">對敏感族群不健康</string>
+    <string name="aqi_level_unhealthy">對所有族群不健康</string>
+    <string name="aqi_level_very_unhealthy">非常不健康</string>
+    <string name="aqi_level_hazardous">危害</string>
+    <string name="aqi_level_unhealthy_short">不健康</string>
+
+    <!-- ── 風向 ───────────────────────────────────────────────────────── -->
+    <string name="wind_calm">無風</string>
+    <string name="wind_unknown">未知</string>
+    <string name="wind_n">北風</string>
+    <string name="wind_ne">東北風</string>
+    <string name="wind_e">東風</string>
+    <string name="wind_se">東南風</string>
+    <string name="wind_s">南風</string>
+    <string name="wind_sw">西南風</string>
+    <string name="wind_w">西風</string>
+    <string name="wind_nw">西北風</string>
+    <string name="compass_n">北</string>
+    <string name="compass_ne">東北</string>
+    <string name="compass_e">東</string>
+    <string name="compass_se">東南</string>
+    <string name="compass_s">南</string>
+    <string name="compass_sw">西南</string>
+    <string name="compass_w">西</string>
+    <string name="compass_nw">西北</string>
+
+    <!-- ── 污染事件類型（後端以英文代碼回傳）──────────────────────────── -->
+    <string name="event_fire">火災/濃煙</string>
+    <string name="event_chemical">化學異味</string>
+    <string name="event_dust">揚塵</string>
+    <string name="event_odor">異味</string>
+    <string name="event_vehicle">車輛廢氣</string>
+    <string name="event_factory">工廠排放</string>
+    <string name="event_general">空氣品質不良</string>
+    <string name="event_unknown_source">污染源</string>
+    <string name="event_unknown_report">污染回報</string>
+
+    <!-- ── 首頁 ───────────────────────────────────────────────────────── -->
+    <!-- SimpleDateFormat 樣式；zh-TW 的 EEE 就是「週日」這種寫法 -->
+    <string name="home_date_pattern">M月d日 EEE</string>
+    <string name="home_nearest_station">鄰近測站: %1$s</string>
+    <string name="home_nearest_station_searching">鄰近測站: 搜尋中…</string>
+    <string name="home_loading">正在取得空氣品質資料…</string>
+    <string name="home_cached_banner">⚠ 網路連線異常，顯示暫存資料</string>
+    <!-- 大標題：這段之後會接一個上色的等級詞，例如「空氣良好」 -->
+    <string name="home_air_prefix">空氣</string>
+    <string name="home_update_time">更新時間 %1$s</string>
+    <string name="home_aqi_badge">AQI %1$s %2$s</string>
+    <string name="home_toast_location_off">未開啟定位，請選擇常用地點</string>
+    <string name="home_toast_location_denied">未取得定位權限，請至系統設定開啟</string>
+    <string name="home_switch_location">切換地點</string>
+    <string name="home_no_favorites">尚未設定常用地點，點右上「＋ 新增」即可加入。</string>
+    <string name="home_favorites_cd">常用地點</string>
+
+    <!-- ── 地點 ───────────────────────────────────────────────────────── -->
+    <string name="location_gps">GPS 定位</string>
+    <string name="location_gps_subtitle">自動偵測目前位置</string>
+    <string name="location_current_marker">✓ 目前</string>
+    <string name="location_add_title">新增常用地點</string>
+    <string name="location_edit_title">編輯地點</string>
+    <string name="location_name_label">名稱</string>
+    <string name="location_address_label">地址</string>
+    <string name="location_name_hint_short">例如：家、公司</string>
+    <string name="location_name_hint">例如：家、公司、健身房</string>
+    <string name="location_address_hint_full">例如：台北市中正區重慶南路一段122號</string>
+    <string name="location_address_hint">例如：台北市中正區重慶南路</string>
+    <string name="location_fill_both">請填寫名稱與地址</string>
+    <string name="location_save_and_switch">儲存並切換</string>
+
+    <!-- ── 首頁行動建議 ───────────────────────────────────────────────── -->
+    <string name="chip_indoor_exercise">室內運動</string>
+    <string name="chip_yoga">瑜珈伸展</string>
+    <string name="chip_ventilation">開窗通風</string>
+    <string name="chip_jogging">戶外跑步</string>
+    <string name="chip_walking">戶外散步</string>
+    <string name="chip_cycling">騎腳踏車</string>
+    <string name="chip_hydration">補充水分</string>
+    <string name="chip_hydration_more">多補充水分</string>
+    <string name="chip_air_purifier">空氣清淨機</string>
+    <string name="chip_mask">戴口罩</string>
+    <string name="chip_close_window">關閉門窗</string>
+    <string name="chip_go_out_less">減少外出</string>
+    <string name="chip_stay_inside">盡量待室內</string>
+    <string name="chip_public_transport">搭大眾運輸</string>
+    <string name="chip_inhaler">備妥吸入器</string>
+    <string name="chip_medicine">備妥藥物</string>
+
+    <!-- ── 首頁錯誤訊息 ───────────────────────────────────────────────── -->
+    <string name="home_error_geocode_fallback">找不到「%1$s」的位置（地址搜尋暫時無法使用），暫以台北市資料顯示</string>
+    <string name="home_error_switch_location">地點切換失敗</string>
+    <string name="home_error_aqi">AQI 取得失敗</string>
+    <string name="home_error_with_reason">%1$s: %2$s</string>
+    <string name="home_current_position">目前位置</string>
+
+    <!-- ── AI 顧問 ────────────────────────────────────────────────────── -->
+    <string name="ai_title">AI 健康顧問</string>
+    <string name="ai_section_advice">AI 個人化建議</string>
+    <string name="ai_placeholder_idle">點擊下方按鈕取得個人化建議</string>
+    <string name="ai_loading">AI 正在分析您的健康狀況與當前空氣品質…</string>
+    <string name="ai_advice_unavailable">目前無法取得建議，請稍後再試。</string>
+    <string name="ai_aqi_caption">空氣品質：%1$s（AQI %2$s）</string>
+    <string name="ai_refresh_cd">重新取得</string>
+    <string name="ai_refresh">重新取得 AI 建議</string>
+    <string name="ai_error">AI 建議取得失敗: %1$s</string>
+    <string name="ai_warning_cd">警告</string>
+    <string name="downwind_title">下風處警告</string>
+    <string name="downwind_body">您目前位於「%1$s」污染熱點的下風處%2$s。%3$s污染物可能隨風飄向您所在位置，請注意防護。</string>
+    <string name="downwind_distance_suffix">（距離約 %1$s km）</string>
+    <string name="downwind_wind_prefix">當前吹%1$s，</string>
+    <string name="ai_disclosure_title">產生個人化建議前</string>
+    <string name="ai_disclosure_body">AI 顧問會將你在「個人健康檔案」填寫的年齡層與身體狀況，連同所在縣市與當前空氣品質，傳送至本App伺服器並轉交第三方 AI 服務（OpenRouter）以生成建議。</string>
+    <string name="ai_disclosure_retention">這些資料僅於生成建議當下使用，不會與你的身分建立關聯後保存。</string>
+    <string name="ai_disclosure_agree">同意並產生建議</string>
+
+    <!-- ── 事件通報 ───────────────────────────────────────────────────── -->
+    <string name="report_title">事件通報</string>
+    <string name="report_section_location">位置</string>
+    <string name="report_location_hint">輸入地址或點擊定位</string>
+    <string name="report_locate">📍 定位</string>
+    <string name="report_section_category">事件類別</string>
+    <string name="report_category_hint">請選擇事件類別</string>
+    <string name="report_section_description">簡易描述</string>
+    <string name="report_description_hint">請描述您觀察到的空氣品質問題…</string>
+    <string name="report_submit">立即通報</string>
+    <string name="report_location_denied">未取得定位權限，請手動輸入地點</string>
+    <string name="report_error_address">無法解析地址，請手動輸入</string>
+    <string name="report_error_location">目前無法取得定位，請稍後再試或手動輸入地址</string>
+    <string name="report_error_empty_fields">請填寫所有欄位</string>
+    <string name="report_error_submit">送出失敗：%1$s</string>
+    <string name="report_success_confirmed">已確認為污染事件，感謝您的通報！</string>
+    <string name="report_success">回報已送出，感謝您的通報。</string>
+    <!-- 類別標籤；送到後端的值固定是中文，這裡只負責顯示 -->
+    <string name="category_factory">工廠排放</string>
+    <string name="category_vehicle">車輛廢氣</string>
+    <string name="category_open_burning">露天燃燒</string>
+    <string name="category_construction_dust">建築揚塵</string>
+    <string name="category_fire_smoke">火災煙霧</string>
+    <string name="category_other">其他</string>
+
+    <!-- ── 通知中心 ───────────────────────────────────────────────────── -->
+    <string name="notif_title">通知中心</string>
+    <string name="notif_map_cd">熱點地圖</string>
+    <string name="notif_empty">目前沒有與您所在區域相關的通知。</string>
+    <string name="notif_disclaimer">民眾回報為使用者提供之資訊，未經證實前僅供參考。</string>
+    <string name="notif_group_fire">火災警示</string>
+    <string name="notif_group_report">民眾回報</string>
+    <string name="notif_group_aqi">空氣品質警報</string>
+    <string name="notif_group_forecast">空品預報警示</string>
+    <string name="notif_group_news">近期新聞</string>
+    <plurals name="notif_item_count">
+        <item quantity="other">%1$d 件</item>
+    </plurals>
+    <string name="notif_fire_fallback_title">重大火災</string>
+    <string name="notif_region_nationwide">全台</string>
+    <string name="notif_aqi_title">AQI %1$s（%2$s）</string>
+    <string name="notif_error">通知資料取得失敗: %1$s</string>
+    <string name="time_just_now">剛剛</string>
+    <string name="time_minutes_ago">%1$d 分鐘前</string>
+    <string name="time_hours_ago">%1$d 小時前</string>
+    <string name="time_days_ago">%1$d 天前</string>
+
+    <!-- ── 熱點地圖 ───────────────────────────────────────────────────── -->
+    <string name="map_title">污染事件地圖</string>
+    <string name="map_back">返回</string>
+    <string name="map_error">地圖資料取得失敗</string>
+    <string name="map_no_reports">目前尚無回報資料</string>
+    <string name="map_location_note">未開啟定位權限，地圖不會標出你的位置；可於首頁改選常用地點</string>
+    <string name="map_fire_alert_title">🔥 重大火災警示</string>
+    <string name="map_calm_wind">⚠ 擴散條件差（近乎無風）</string>
+    <string name="map_wind_info">風向：%1$s  風速：%2$s m/s</string>
+    <string name="map_hotspot_title">%1$s（%2$d 筆回報）</string>
+    <string name="map_hotspot_snippet">強度：%1$d%%  範圍：%2$s km｜%3$s</string>
+    <string name="map_legend">圖例</string>
+    <string name="map_legend_fire_section">— 消防署火災警示</string>
+    <string name="map_legend_major_fire">重大火災</string>
+    <string name="map_legend_cluster_section">— 熱點叢集</string>
+    <string name="map_legend_high" formatted="false">高強度 ≥ 80%</string>
+    <string name="map_legend_mid" formatted="false">中強度 ≥ 50%</string>
+    <string name="map_legend_low" formatted="false">低強度 &lt; 50%</string>
+    <string name="map_legend_calm">擴散條件差（無風）</string>
+    <string name="map_legend_report_section">— 個別回報</string>
+    <string name="map_legend_vehicle_factory">車輛/工廠</string>
+
+    <!-- ── 設定 ───────────────────────────────────────────────────────── -->
+    <string name="settings_title">設定</string>
+    <string name="settings_section_notifications">通知設定</string>
+    <string name="settings_daily_description">開啟後，每天會在你指定的時間收到一次所在地區的空氣品質摘要通知</string>
+    <string name="settings_daily_switch">每日空氣品質通知</string>
+    <string name="settings_notify_time">通知時間</string>
+    <string name="settings_test_notification">🔔 發送測試通知</string>
+    <string name="settings_health_profile">個人健康檔案</string>
+    <string name="settings_favorites">常用地點</string>
+    <string name="settings_user_guide">使用說明</string>
+    <string name="settings_language">語言</string>
+    <string name="settings_language_dialog_title">選擇語言</string>
+    <string name="language_system">跟隨系統</string>
+    <string name="language_zh">繁體中文</string>
+    <string name="language_en">English</string>
+    <string name="time_picker_title">選擇通知時間</string>
+    <string name="favorites_empty">尚未新增常用地點</string>
+
+    <string name="settings_msg_daily_sync_failed">通知設定未能同步：%1$s</string>
+    <string name="settings_msg_test_failed">⚠️ 發送失敗：%1$s</string>
+    <string name="settings_msg_sensitive_on">已開啟敏感族群警示，健康狀況將用於推播分眾</string>
+    <string name="settings_msg_sensitive_off">已關閉，伺服器上的健康狀況已一併清除</string>
+    <string name="settings_msg_sync_failed">設定未能同步：%1$s</string>
+    <string name="settings_msg_health_saved_local">✅ 健康檔案已儲存於本機</string>
+    <string name="settings_msg_health_saved_synced">✅ 健康檔案已儲存，警示分眾已同步更新</string>
+    <string name="settings_msg_health_saved_sync_failed">✅ 健康檔案已存於本機，但警示分眾未能同步：%1$s</string>
+
+    <!-- ── 健康檔案 ───────────────────────────────────────────────────── -->
+    <string name="health_dialog_title">個人健康檔案</string>
+    <string name="health_dialog_description">這份資料儲存於你的裝置，用來讓 AI 顧問與首頁建議更貼近你的情況。使用 AI 建議時會即時傳送至伺服器生成建議，不會保存。</string>
+    <string name="health_field_age">年齡層</string>
+    <string name="health_field_conditions">生理狀態與病史</string>
+    <string name="health_field_other">其他說明</string>
+    <string name="health_other_hint">如長期服用藥物、特殊病史等</string>
+    <string name="health_field_sensitive_alerts">依健康狀況發送警示</string>
+    <string name="health_sensitive_description">開啟後，以上資料會傳送並保存於伺服器，讓空氣品質變差時能優先提醒你。關閉時伺服器會一併刪除。</string>
+    <string name="health_switch_on">已開啟</string>
+    <string name="health_switch_off">未開啟</string>
+    <!-- 年齡層與病史標籤；存進本機與送到後端的值固定是中文，這裡只負責顯示 -->
+    <string name="age_under_18">18歲以下</string>
+    <string name="age_18_64">18-64歲</string>
+    <string name="age_65_plus">65歲以上</string>
+    <string name="condition_asthma">氣喘</string>
+    <string name="condition_cardiovascular">心血管疾病</string>
+    <string name="condition_pregnant">懷孕中</string>
+    <string name="condition_allergy">過敏</string>
+    <string name="condition_respiratory">呼吸道疾病</string>
+    <string name="condition_hypertension">高血壓</string>
+
+    <!-- ── 首次啟動說明 ───────────────────────────────────────────────── -->
+    <string name="intro_title">為什麼需要你的健康狀況？</string>
+    <string name="intro_body_1">同樣的空氣品質，對氣喘、心血管疾病、孕婦、長者與孩童的影響並不一樣。</string>
+    <string name="intro_body_2">填寫年齡層與身體狀況後，AI 顧問會依你的情況給個人化的防護建議，首頁的行動建議也會跟著調整。</string>
+    <string name="intro_body_3">這份資料預設只存在你的裝置上，可以隨時修改或清除。</string>
+    <string name="intro_fill_now">去填寫</string>
+    <string name="intro_later">稍後再說</string>
+
+    <!-- ── 使用說明 ───────────────────────────────────────────────────── -->
+    <string name="user_guide_text">本App提供台灣即時空氣品質資訊與個人化健康防護，主要功能如下：\n\n1. 首頁\n- 顯示所在地區最近測站的即時 AQI 與空氣品質等級。\n- 點右上角圖示可切換「GPS 定位」或你設定的常用地點。\n\n2. AI 顧問\n- 依你的健康檔案與當前空品，提供個人化健康建議。\n\n3. 通報（中間橘色按鈕）\n- 發現火災、異味、揚塵等空污事件，可填寫地點與描述向社群通報。\n\n4. 通知中心\n- 查看空品預報、警報，以及附近的民眾回報。\n- 點右上角地圖圖示，可看官方火災警示與回報熱點地圖。\n\n5. 設定\n- 開關每日空氣品質通知並設定推播時間。\n- 編輯個人健康檔案（預設僅儲存於本機），並可決定是否讓伺服器依你的健康狀況優先發送警示。\n- 新增常用地點，方便快速切換查詢。\n- 切換介面語言（繁體中文／English）。</string>
+
+    <!-- ── 推播 ───────────────────────────────────────────────────────── -->
+    <string name="notification_channel_name">空氣品質警報</string>
+    <string name="notification_default_title">空氣品質警報</string>
+    <string name="fcm_error_no_token">尚未取得推播識別碼</string>
+    <string name="fcm_error_no_token_retry">尚未取得推播識別碼，請稍後再試</string>
+    <string name="fcm_error_connection">連線失敗</string>
+    <string name="fcm_error_rejected">後端未接受這次設定</string>
+    <string name="fcm_error_send">發送失敗</string>
+    <string name="fcm_test_sent">✅ 測試通知已發送（%1$s AQI %2$s）</string>
 </resources>

@@ -96,7 +96,10 @@ data class RagAdviceRequest(
     val longitude: Double? = null,
     val aqi: Int? = null,
     val pm25: Double? = null,
-    @SerializedName("user_profile") val userProfile: RagUserProfile = RagUserProfile()
+    @SerializedName("user_profile") val userProfile: RagUserProfile = RagUserProfile(),
+    // 建議要用哪個語言生成（zh / en）。只影響 advice 文字，
+    // aqi_level 等欄位後端一律回中文，由 App 自己本地化。
+    val lang: String = "zh"
 )
 
 data class DownwindSource(
