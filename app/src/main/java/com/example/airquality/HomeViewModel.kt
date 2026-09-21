@@ -1,6 +1,7 @@
 package com.example.airquality
 
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.airquality.data.AirQualityRepository
@@ -14,6 +15,7 @@ import com.example.airquality.data.LocationChoice
 import com.example.airquality.data.LocationPreferenceRepository
 import com.example.airquality.data.LocationRepository
 import com.example.airquality.data.LocationResult
+import com.example.airquality.data.Localizer
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -62,7 +64,8 @@ class HomeViewModel(
     private val location: LocationRepository = AppContainer.location,
     private val healthProfile: HealthProfileRepository = AppContainer.healthProfile,
     private val fcmToken: FcmTokenRepository = AppContainer.fcmToken,
-    private val locationPreference: LocationPreferenceRepository = AppContainer.locationPreference
+    private val locationPreference: LocationPreferenceRepository = AppContainer.locationPreference,
+    private val localizer: Localizer = AppContainer.localizer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AqiUiState>(AqiUiState.Loading)
@@ -166,7 +169,9 @@ class HomeViewModel(
             try {
                 val coords = geocoding.forwardGeocode(address)
                 if (coords == null) {
-                    _userMessage.tryEmit("找不到「$name」的位置（地址搜尋暫時無法使用），暫以台北市資料顯示")
+                    _userMessage.tryEmit(
+                        localizer.string(R.string.home_error_geocode_fallback, name)
+                    )
                 }
                 val resolved = coords ?: DEFAULT_COORDINATES
                 val nearest = loadAqi(resolved, displayRegion = address)
@@ -178,7 +183,7 @@ class HomeViewModel(
                 fcmToken.uploadRegistration(nearest.county, resolved)
                 refreshWeather(nearest.county, resolved)
             } catch (e: Exception) {
-                fallbackToCache("switchToSavedLocation 失敗", e, "地點切換失敗")
+                fallbackToCache("switchToSavedLocation 失敗", e, R.string.home_error_switch_location)
             }
         }
     }
@@ -206,13 +211,14 @@ class HomeViewModel(
     private suspend fun loadByCoordinates(coords: Coordinates) {
         _uiState.value = AqiUiState.Loading
         try {
-            val region = geocoding.reverseGeocodeCounty(coords.lat, coords.lng) ?: "目前位置"
+            val region = geocoding.reverseGeocodeCounty(coords.lat, coords.lng)
+                ?: localizer.string(R.string.home_current_position)
             val nearest = loadAqi(coords, displayRegion = region)
             userCoordinates = coords
             fcmToken.uploadRegistration(nearest.county, coords)
             refreshWeather(nearest.county, coords)
         } catch (e: Exception) {
-            fallbackToCache("GPS 定位載入失敗", e, "AQI 取得失敗")
+            fallbackToCache("GPS 定位載入失敗", e, R.string.home_error_aqi)
         }
     }
 
@@ -222,7 +228,7 @@ class HomeViewModel(
         try {
             loadAqi(DEFAULT_COORDINATES, displayRegion = DEFAULT_REGION)
         } catch (e: Exception) {
-            fallbackToCache("預設地區載入失敗", e, "AQI 取得失敗")
+            fallbackToCache("預設地區載入失敗", e, R.string.home_error_aqi)
         }
     }
 
@@ -230,7 +236,7 @@ class HomeViewModel(
     private suspend fun loadAqi(coords: Coordinates, displayRegion: String): AqiRecord {
         val response = airQuality.airQuality()
         val nearest = airQuality.nearestStation(response.records, coords.lat, coords.lng)
-            ?: throw IllegalStateException("沒有取得 AQI 資料")
+            ?: throw IllegalStateException("no AQI records returned")
         val successState = AqiUiState.Success(
             data = response,
             nearestRecord = nearest,
@@ -252,14 +258,20 @@ class HomeViewModel(
         }
     }
 
-    private fun fallbackToCache(logMessage: String, cause: Exception, userFacing: String) {
+    private fun fallbackToCache(logMessage: String, cause: Exception, @StringRes userFacing: Int) {
         val cached = lastSuccessState
         if (cached != null) {
             Log.w(TAG, "$logMessage，改用快取資料：${cause.localizedMessage}")
             _uiState.value = cached.copy(isFromCache = true)
         } else {
             Log.e(TAG, logMessage, cause)
-            _uiState.value = AqiUiState.Error("$userFacing: ${cause.localizedMessage}")
+            _uiState.value = AqiUiState.Error(
+                localizer.string(
+                    R.string.home_error_with_reason,
+                    localizer.string(userFacing),
+                    cause.localizedMessage ?: ""
+                )
+            )
         }
     }
 
@@ -280,12 +292,16 @@ class HomeViewModel(
                     longitude = userCoordinates?.lng,
                     aqi = success?.nearestRecord?.aqi?.toIntOrNull(),
                     pm25 = success?.nearestRecord?.pm25?.toDoubleOrNull(),
-                    userProfile = userProfile
+                    userProfile = userProfile,
+                    // 讓後端的 LLM 用使用者目前的介面語言寫建議
+                    lang = localizer.apiLanguageTag()
                 )
                 _ragAdviceState.value = RagAdviceUiState.Success(airQuality.ragAdvice(request))
             } catch (e: Exception) {
                 Log.e(TAG, "fetchRagAdvice failed", e)
-                _ragAdviceState.value = RagAdviceUiState.Error("AI 建議取得失敗: ${e.localizedMessage}")
+                _ragAdviceState.value = RagAdviceUiState.Error(
+                    localizer.string(R.string.ai_error, e.localizedMessage ?: "")
+                )
             }
         }
     }
@@ -304,27 +320,34 @@ class HomeViewModel(
 
     // ── 顯示用工具 ────────────────────────────────────────────────────────
 
-    /** 中文 8 方位風向。 */
+    /** 8 方位風向的顯示字串。 */
     fun getWindDirectionString(degreesStr: String, speedStr: String): String {
         val speed = speedStr.toFloatOrNull() ?: 0f
-        if (speed < 0.3f) return "無風"
+        if (speed < 0.3f) return localizer.string(R.string.wind_calm)
 
-        val degrees = degreesStr.toFloatOrNull() ?: return "未知"
-
-        val directions = arrayOf(
-            "北風", "東北風", "東風", "東南風",
-            "南風", "西南風", "西風", "西北風"
-        )
+        val degrees = degreesStr.toFloatOrNull() ?: return localizer.string(R.string.wind_unknown)
 
         val index = ((degrees + 22.5f) / 45f).toInt() % 8
-        return directions[index]
+        return localizer.string(WIND_DIRECTION_LABELS[index])
     }
 
-    private companion object {
-        const val TAG = "HomeViewModel"
+    companion object {
+        /**
+         * GPS 模式的正規值。這是存進 SharedPreferences、也用來與常用地點
+         * 名稱比對的識別字串，所以不翻譯；畫面上顯示的是
+         * `R.string.location_gps`。
+         */
         const val GPS_MODE_NAME = "GPS 定位"
-        const val DEFAULT_REGION = "台北市"
+
+        private const val TAG = "HomeViewModel"
+        private const val DEFAULT_REGION = "台北市"
+
+        private val WIND_DIRECTION_LABELS = intArrayOf(
+            R.string.wind_n,  R.string.wind_ne, R.string.wind_e,  R.string.wind_se,
+            R.string.wind_s,  R.string.wind_sw, R.string.wind_w,  R.string.wind_nw,
+        )
+
         // 預設位置：台北市中心（北緯 25°05'14"、東經 121°33'20"）
-        val DEFAULT_COORDINATES = Coordinates(25.087222, 121.555556)
+        private val DEFAULT_COORDINATES = Coordinates(25.087222, 121.555556)
     }
 }

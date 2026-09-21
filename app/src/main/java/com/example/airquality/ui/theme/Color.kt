@@ -49,16 +49,8 @@ val AqiRed = Color(0xFFCC0033)     // 對所有族群不良
 val AqiPurple = Color(0xFF660099)  // 非常不良
 val AqiMaroon = Color(0xFF7E0023)  // 危害
 
-fun getAqiColor(status: String): Color {
-    return when {
-        status.contains("良好") -> AqiGreen
-        status.contains("普通") -> AqiYellow
-        status.contains("對敏感族群不健康") -> AqiOrange
-        status.contains("對所有族群不健康") -> AqiRed
-        status.contains("非常不健康") -> AqiPurple
-        status.contains("危害") -> AqiMaroon
-        else -> AqiGreen // Fallback
-    }
-}
+/** 等級對應的顏色；判定與顯示字串都收在 [com.example.airquality.AqiLevel]。 */
+fun getAqiColor(status: String): Color =
+    com.example.airquality.AqiLevel.fromStatus(status).color
 
 

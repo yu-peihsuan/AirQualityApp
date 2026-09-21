@@ -12,6 +12,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -41,28 +42,27 @@ fun HealthProfileIntroDialog(
         onDismissRequest = onDismiss,
         containerColor = BgMain,
         title = {
-            Text("為什麼需要你的健康狀況？", fontWeight = FontWeight.Bold, color = TextDark)
+            Text(stringResource(R.string.intro_title), fontWeight = FontWeight.Bold, color = TextDark)
         },
         text = {
             Column {
                 Text(
-                    "同樣的空氣品質，對氣喘、心血管疾病、孕婦、長者與孩童的影響並不一樣。",
+                    stringResource(R.string.intro_body_1),
                     color = TextDark, fontSize = 14.sp, lineHeight = 21.sp
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "填寫年齡層與身體狀況後，AI 顧問會依你的情況給個人化的防護建議，" +
-                        "首頁的行動建議也會跟著調整。",
+                    stringResource(R.string.intro_body_2),
                     color = TextDark, fontSize = 14.sp, lineHeight = 21.sp
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "這份資料預設只存在你的裝置上，可以隨時修改或清除。",
+                    stringResource(R.string.intro_body_3),
                     color = TextGray, fontSize = 13.sp, lineHeight = 20.sp
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "隱私權政策",
+                    stringResource(R.string.privacy_policy),
                     color = OrangeMain,
                     fontSize = 13.sp,
                     textDecoration = TextDecoration.Underline,
@@ -74,12 +74,12 @@ fun HealthProfileIntroDialog(
         },
         confirmButton = {
             TextButton(onClick = onGoToHealthProfile) {
-                Text("去填寫", color = OrangeMain, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.intro_fill_now), color = OrangeMain, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("稍後再說", color = TextGray)
+                Text(stringResource(R.string.intro_later), color = TextGray)
             }
         }
     )

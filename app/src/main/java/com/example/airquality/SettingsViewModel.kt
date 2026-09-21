@@ -3,9 +3,11 @@ package com.example.airquality
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.airquality.data.AppContainer
+import com.example.airquality.data.AppLanguage
 import com.example.airquality.data.FavoriteLocation
 import com.example.airquality.data.FcmTokenRepository
 import com.example.airquality.data.HealthProfileRepository
+import com.example.airquality.data.Localizer
 import com.example.airquality.data.LocationPreferenceRepository
 import com.example.airquality.data.NotificationSettingsRepository
 import com.example.airquality.data.SyncResult
@@ -28,7 +30,8 @@ class SettingsViewModel(
     private val notificationSettings: NotificationSettingsRepository = AppContainer.notificationSettings,
     private val healthProfile: HealthProfileRepository = AppContainer.healthProfile,
     private val locationPreference: LocationPreferenceRepository = AppContainer.locationPreference,
-    private val fcmToken: FcmTokenRepository = AppContainer.fcmToken
+    private val fcmToken: FcmTokenRepository = AppContainer.fcmToken,
+    private val localizer: Localizer = AppContainer.localizer
 ) : ViewModel() {
 
     private val _dailyEnabled = MutableStateFlow(notificationSettings.dailyEnabled)
@@ -54,6 +57,18 @@ class SettingsViewModel(
 
     private val _favorites = MutableStateFlow(locationPreference.favorites())
     val favorites: StateFlow<List<FavoriteLocation>> = _favorites.asStateFlow()
+
+    private val _language = MutableStateFlow(localizer.language)
+    val language: StateFlow<AppLanguage> = _language.asStateFlow()
+
+    /**
+     * 只負責把偏好存起來；真正套用是畫面層呼叫 `Activity.recreate()`，
+     * 讓 `MainActivity.attachBaseContext` 用新語系重建一次整個畫面。
+     */
+    fun setLanguage(language: AppLanguage) {
+        localizer.setLanguage(language)
+        _language.value = language
+    }
 
     /**
      * 是否該跳出首次的健康檔案說明彈窗。看過一次之後永遠是 false。
@@ -104,7 +119,9 @@ class SettingsViewModel(
                 is SyncResult.Success -> Unit
                 is SyncResult.Failure -> {
                     onFailure()
-                    _message.tryEmit("通知設定未能同步：${result.message}")
+                    _message.tryEmit(
+                        localizer.string(R.string.settings_msg_daily_sync_failed, result.message)
+                    )
                 }
             }
         }
@@ -114,7 +131,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             fcmToken.sendTestNotification()
                 .onSuccess { _message.tryEmit(it) }
-                .onFailure { _message.tryEmit("⚠️ 發送失敗：${it.message}") }
+                .onFailure {
+                    _message.tryEmit(
+                        localizer.string(R.string.settings_msg_test_failed, it.message ?: "")
+                    )
+                }
         }
     }
 
@@ -132,13 +153,15 @@ class SettingsViewModel(
             when (val result = fcmToken.uploadRegistration()) {
                 is SyncResult.Success ->
                     _message.tryEmit(
-                        if (enabled) "已開啟敏感族群警示，健康狀況將用於推播分眾"
-                        else "已關閉，伺服器上的健康狀況已一併清除"
+                        localizer.string(
+                            if (enabled) R.string.settings_msg_sensitive_on
+                            else R.string.settings_msg_sensitive_off
+                        )
                     )
                 is SyncResult.Failure -> {
                     _sensitiveAlertsEnabled.value = previous
                     notificationSettings.sensitiveAlertsEnabled = previous
-                    _message.tryEmit("設定未能同步：${result.message}")
+                    _message.tryEmit(localizer.string(R.string.settings_msg_sync_failed, result.message))
                 }
             }
         }
@@ -163,14 +186,17 @@ class SettingsViewModel(
         // 已同意分眾推播的使用者，改完健康檔案要讓伺服器那份跟著更新；
         // 同步失敗要講出來，否則使用者會以為警示分眾已經跟著改了
         if (!_sensitiveAlertsEnabled.value) {
-            _message.tryEmit("✅ 健康檔案已儲存於本機")
+            _message.tryEmit(localizer.string(R.string.settings_msg_health_saved_local))
             return
         }
         viewModelScope.launch {
             when (val result = fcmToken.uploadRegistration()) {
-                is SyncResult.Success -> _message.tryEmit("✅ 健康檔案已儲存，警示分眾已同步更新")
+                is SyncResult.Success ->
+                    _message.tryEmit(localizer.string(R.string.settings_msg_health_saved_synced))
                 is SyncResult.Failure ->
-                    _message.tryEmit("✅ 健康檔案已存於本機，但警示分眾未能同步：${result.message}")
+                    _message.tryEmit(
+                        localizer.string(R.string.settings_msg_health_saved_sync_failed, result.message)
+                    )
             }
         }
     }

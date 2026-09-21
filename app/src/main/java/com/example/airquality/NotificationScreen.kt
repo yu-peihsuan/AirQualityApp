@@ -13,10 +13,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.annotation.StringRes
+import android.content.Context
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airquality.ui.theme.*
 import java.text.SimpleDateFormat
@@ -24,7 +29,7 @@ import java.util.Locale
 
 // ── 相對時間 ───────────────────────────────────────────────────────────────────
 
-private fun relativeTime(timestamp: String): String {
+private fun relativeTime(context: Context, timestamp: String): String {
     if (timestamp.isBlank()) return ""
     return try {
         val clean = timestamp.trim()
@@ -37,10 +42,10 @@ private fun relativeTime(timestamp: String): String {
         val diff = System.currentTimeMillis() - date.time
         val m = diff / 60_000
         when {
-            m < 1    -> "剛剛"
-            m < 60   -> "${m} 分鐘前"
-            m < 1440 -> "${m / 60} 小時前"
-            else     -> "${m / 1440} 天前"
+            m < 1    -> context.getString(R.string.time_just_now)
+            m < 60   -> context.getString(R.string.time_minutes_ago, m.toInt())
+            m < 1440 -> context.getString(R.string.time_hours_ago, (m / 60).toInt())
+            else     -> context.getString(R.string.time_days_ago, (m / 1440).toInt())
         }
     } catch (e: Exception) {
         timestamp.take(10)
@@ -51,40 +56,30 @@ private fun relativeTime(timestamp: String): String {
 
 private data class SectionStyle(
     val icon: String,
-    val label: String,
+    @StringRes val labelRes: Int,
     val accentColor: Color,
     val cardBg: Color
 )
 
-@Composable
 private fun sectionStyle(group: NotifGroup): SectionStyle = when (group) {
-    NotifGroup.FIRE     -> SectionStyle("🔥", "火災警示",    Color(0xFFB71C1C), Color(0xFFFFF3F3))
-    NotifGroup.REPORT   -> SectionStyle("👤", "民眾回報",    OrangeMain,        OrangeLight)
-    NotifGroup.AQI      -> SectionStyle("🔴", "空氣品質警報", AqiRed,           Color(0xFFFFF3F3))
-    NotifGroup.FORECAST -> SectionStyle("📅", "空品預報警示", Color(0xFF1565C0), Color(0xFFE3F2FD))
-    NotifGroup.NEWS     -> SectionStyle("📰", "近期新聞",    TextGray,          CardWhite)
+    NotifGroup.FIRE     -> SectionStyle("🔥", R.string.notif_group_fire,     Color(0xFFB71C1C), Color(0xFFFFF3F3))
+    NotifGroup.REPORT   -> SectionStyle("👤", R.string.notif_group_report,   OrangeMain,        OrangeLight)
+    NotifGroup.AQI      -> SectionStyle("🔴", R.string.notif_group_aqi,      AqiRed,            Color(0xFFFFF3F3))
+    NotifGroup.FORECAST -> SectionStyle("📅", R.string.notif_group_forecast, Color(0xFF1565C0), Color(0xFFE3F2FD))
+    NotifGroup.NEWS     -> SectionStyle("📰", R.string.notif_group_news,     TextGray,          CardWhite)
 }
 
 // ── 卡片內容萃取 ──────────────────────────────────────────────────────────────
 
-private fun eventLabel(type: String?): String = when (type) {
-    "fire"                -> "火災/濃煙"
-    "chemical"            -> "化學異味"
-    "dust"                -> "揚塵"
-    "odor"                -> "異味"
-    "vehicle"             -> "車輛廢氣"
-    "factory"             -> "工廠排放"
-    "general_air_quality" -> "空氣品質不良"
-    else                  -> "污染回報"
-}
-
-private fun cardContent(item: NewsRecord, group: NotifGroup): Pair<String, String> = when (group) {
+private fun cardContent(context: Context, item: NewsRecord, group: NotifGroup): Pair<String, String> = when (group) {
     NotifGroup.FIRE   -> Pair(
-        item.title.ifBlank { "重大火災" },
+        item.title.ifBlank { context.getString(R.string.notif_fire_fallback_title) },
         item.summary.ifBlank { item.region }
     )
     NotifGroup.REPORT -> {
-        val label = eventLabel(item.structuredEvent?.eventType ?: item.category)
+        val label = context.getString(
+            eventTypeLabelRes(item.structuredEvent?.eventType ?: item.category)
+        )
         // 不標示「已證實／未證實」（僅 AI 判斷、非官方核實，避免誤導）；
         // 底部免責聲明已說明僅供參考。標題僅顯示事件類型，完整描述放內容區、
         // 地址縮到底部小字（見 NotifItem）
@@ -134,11 +129,11 @@ fun NotificationScreen(
             .background(BgMain)
     ) {
         AppHeader(
-            title = "通知中心",
+            title = stringResource(R.string.notif_title),
             actions = {
                 androidx.compose.foundation.Image(
                     painter = androidx.compose.ui.res.painterResource(id = R.drawable.location),
-                    contentDescription = "熱點地圖",
+                    contentDescription = stringResource(R.string.notif_map_cd),
                     modifier = Modifier
                         .size(26.dp)
                         .clickable { showMap = true },
@@ -162,7 +157,7 @@ fun NotificationScreen(
                 val sections = (uiState as NotificationUiState.Success).sections
                 if (sections.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("目前沒有與您所在區域相關的通知。", color = TextMid, fontSize = 16.sp)
+                        Text(stringResource(R.string.notif_empty), color = TextMid, fontSize = 16.sp)
                     }
                 } else {
                     Column(
@@ -179,7 +174,7 @@ fun NotificationScreen(
                         // 民眾回報免責聲明（僅在列表含回報時顯示）
                         if (sections.any { it.group == NotifGroup.REPORT }) {
                             Text(
-                                "民眾回報為使用者提供之資訊，未經證實前僅供參考。",
+                                stringResource(R.string.notif_disclaimer),
                                 fontSize = 11.sp,
                                 color = TextGray,
                                 modifier = Modifier.fillMaxWidth(),
@@ -207,13 +202,16 @@ private fun SectionBlock(section: NotificationSection) {
         Text(style.icon, fontSize = 16.sp)
         Spacer(Modifier.width(6.dp))
         Text(
-            style.label,
+            stringResource(style.labelRes),
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = style.accentColor
         )
         Spacer(Modifier.width(6.dp))
-        Text("${section.items.size} 件", fontSize = 13.sp, color = TextGray)
+        Text(
+            pluralStringResource(R.plurals.notif_item_count, section.items.size, section.items.size),
+            fontSize = 13.sp, color = TextGray
+        )
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -237,8 +235,9 @@ private fun NotifItem(
     accentColor: Color,
     cardBg: Color
 ) {
-    val (title, subtitle) = cardContent(item, group)
-    val time = relativeTime(item.publishedAt)
+    val context = LocalContext.current
+    val (title, subtitle) = cardContent(context, item, group)
+    val time = relativeTime(context, item.publishedAt)
 
     Row(
         modifier = Modifier

@@ -1,7 +1,9 @@
 package com.example.airquality
 
 import android.app.Application
+import android.content.Context
 import com.example.airquality.data.AppContainer
+import com.example.airquality.data.AppLocale
 import kotlin.concurrent.thread
 
 /**
@@ -13,6 +15,15 @@ import kotlin.concurrent.thread
  * 使用者開啟畫面之前就觸發並上傳 FCM Token，那時憑證必須已經可以取得。
  */
 class AirQualityApplication : Application() {
+
+    /**
+     * 讓 applicationContext 也帶著使用者選的語言，這樣在沒有 Activity 的
+     * 情境（例如推播進來時建立通知）取到的字串才是對的。
+     */
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(AppLocale.wrap(base))
+    }
+
     override fun onCreate() {
         super.onCreate()
         // Repository 一律在這裡建好，並且只持有 applicationContext；

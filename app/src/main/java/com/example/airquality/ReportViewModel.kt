@@ -8,6 +8,7 @@ import com.example.airquality.data.Coordinates
 import com.example.airquality.data.GeocodingRepository
 import com.example.airquality.data.LocationRepository
 import com.example.airquality.data.LocationResult
+import com.example.airquality.data.Localizer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,7 +33,8 @@ sealed class LocationFetchState {
 class ReportViewModel(
     private val airQuality: AirQualityRepository = AppContainer.airQuality,
     private val geocoding: GeocodingRepository = AppContainer.geocoding,
-    private val location: LocationRepository = AppContainer.location
+    private val location: LocationRepository = AppContainer.location,
+    private val localizer: Localizer = AppContainer.localizer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ReportUiState>(ReportUiState.Idle)
@@ -52,7 +54,7 @@ class ReportViewModel(
             val address = geocoding.reverseGeocodeAddress(lat, lng)
             _locationFetchState.value =
                 if (address != null) LocationFetchState.Success(address)
-                else LocationFetchState.Error("無法解析地址，請手動輸入")
+                else LocationFetchState.Error(localizer.string(R.string.report_error_address))
         }
     }
 
@@ -68,7 +70,7 @@ class ReportViewModel(
                 }
                 LocationResult.Unavailable -> {
                     _locationFetchState.value =
-                        LocationFetchState.Error("目前無法取得定位，請稍後再試或手動輸入地址")
+                        LocationFetchState.Error(localizer.string(R.string.report_error_location))
                     return@launch
                 }
             }
@@ -78,7 +80,8 @@ class ReportViewModel(
                 cachedGpsAddress = address
                 _locationFetchState.value = LocationFetchState.Success(address)
             } else {
-                _locationFetchState.value = LocationFetchState.Error("無法解析地址，請手動輸入")
+                _locationFetchState.value =
+                    LocationFetchState.Error(localizer.string(R.string.report_error_address))
             }
         }
     }
@@ -89,7 +92,7 @@ class ReportViewModel(
 
     fun submitReport(location: String, category: String, description: String) {
         if (location.isBlank() || category.isBlank() || description.isBlank()) {
-            _uiState.value = ReportUiState.Error("請填寫所有欄位")
+            _uiState.value = ReportUiState.Error(localizer.string(R.string.report_error_empty_fields))
             return
         }
         viewModelScope.launch {
@@ -117,10 +120,14 @@ class ReportViewModel(
                     _uiState.value = ReportUiState.Error(response.message)
                     return@launch
                 }
-                val msg = if (response.isConfirmed) "已確認為污染事件，感謝您的通報！" else "回報已送出，感謝您的通報。"
+                val msg = localizer.string(
+                    if (response.isConfirmed) R.string.report_success_confirmed else R.string.report_success
+                )
                 _uiState.value = ReportUiState.Success(msg, response.isConfirmed)
             } catch (e: Exception) {
-                _uiState.value = ReportUiState.Error("送出失敗：${e.localizedMessage}")
+                _uiState.value = ReportUiState.Error(
+                    localizer.string(R.string.report_error_submit, e.localizedMessage ?: "")
+                )
             }
         }
     }

@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -58,7 +59,7 @@ fun AiHealthScreen(
             .background(Color(0xFFFFFFFF))
     ) {
         // ── Header ──────────────────────────────────────────────────────────
-        AppHeader(title = "AI 健康顧問", centeredTitle = true, fontSize = 18.sp)
+        AppHeader(title = stringResource(R.string.ai_title), centeredTitle = true, fontSize = 18.sp)
 
         // ── 主要內容 ────────────────────────────────────────────────────────
         Column(
@@ -71,7 +72,7 @@ fun AiHealthScreen(
 
             // ── AI 個人化建議卡 ───────────────────────────────────────────
             Text(
-                text = "AI 個人化建議",
+                text = stringResource(R.string.ai_section_advice),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF888888),
@@ -93,7 +94,7 @@ fun AiHealthScreen(
 
                 // 尚未載入
                 is RagAdviceUiState.Idle -> {
-                    if (hasConsented) RagPlaceholderCard("點擊下方按鈕取得個人化建議")
+                    if (hasConsented) RagPlaceholderCard(stringResource(R.string.ai_placeholder_idle))
                 }
 
                 // 載入中
@@ -109,17 +110,12 @@ fun AiHealthScreen(
                     // ── 下風處警告卡 ──────────────────────────────────────
                     if (resp.isDownwind == true) {
                         val src = resp.downwindSources?.firstOrNull()
-                        val typeLabel = when (src?.dominantType) {
-                            "fire"               -> "火災/濃煙"
-                            "chemical"           -> "化學異味"
-                            "dust"               -> "揚塵"
-                            "odor"               -> "異味"
-                            "vehicle"            -> "車輛廢氣"
-                            "factory"            -> "工廠排放"
-                            "general_air_quality"-> "空氣品質不良"
-                            else                 -> "污染源"
-                        }
-                        val distText = src?.let { "距離約 ${it.distanceKm} km" } ?: ""
+                        val typeLabel = stringResource(
+                            eventTypeLabelRes(src?.dominantType, R.string.event_unknown_source)
+                        )
+                        val distText = src
+                            ?.let { stringResource(R.string.downwind_distance_suffix, it.distanceKm.toString()) }
+                            ?: ""
                         val windDirStr = resp.windDirection?.let {
                             homeViewModel.getWindDirectionString(it.toString(), resp.windSpeed?.toString() ?: "0")
                         } ?: ""
@@ -134,16 +130,21 @@ fun AiHealthScreen(
 
                     HealthAdviceCard(
                         ChatMessage(
-                            text      = resp.advice ?: "目前無法取得建議，請稍後再試。",
+                            text      = resp.advice ?: stringResource(R.string.ai_advice_unavailable),
                             isWarning = isWarning
                         )
                     )
 
                     Spacer(Modifier.height(8.dp))
-                    // 顯示 AQI 等級小標籤
+                    // 顯示 AQI 等級小標籤（後端回的是中文等級名，收斂成本地字串）
                     if (resp.aqiLevel != null) {
+                        val level = AqiLevel.of(resp.aqiLevel, resp.aqi)
                         Text(
-                            text = "空氣品質：${resp.aqiLevel}（AQI ${resp.aqi ?: "-"}）",
+                            text = stringResource(
+                                R.string.ai_aqi_caption,
+                                stringResource(level.labelRes),
+                                resp.aqi?.toString() ?: "-"
+                            ),
                             fontSize = 12.sp,
                             color = Color(0xFF999999),
                             modifier = Modifier.padding(start = 4.dp)
@@ -153,7 +154,7 @@ fun AiHealthScreen(
 
                 // 失敗
                 is RagAdviceUiState.Error -> {
-                    RagPlaceholderCard("⚠️ ${state.message}")
+                    RagPlaceholderCard("⚠️ ${state.message}")  // message 已經是本地化過的
                 }
             }
 
@@ -169,11 +170,11 @@ fun AiHealthScreen(
             ) {
                 Icon(
                     Icons.Outlined.Refresh,
-                    contentDescription = "重新取得",
+                    contentDescription = stringResource(R.string.ai_refresh_cd),
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(6.dp))
-                Text("重新取得 AI 建議", fontSize = 14.sp)
+                Text(stringResource(R.string.ai_refresh), fontSize = 14.sp)
             }
 
             Spacer(Modifier.height(32.dp))
@@ -216,7 +217,7 @@ fun HealthAdviceCard(message: ChatMessage) {
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Warning,
-                        contentDescription = "Warning",
+                        contentDescription = stringResource(R.string.ai_warning_cd),
                         modifier = Modifier.size(20.dp),
                         tint = Color(0xFF666666)
                     )
@@ -250,7 +251,7 @@ private fun RagLoadingCard() {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "AI 正在分析您的健康狀況與當前空氣品質...",
+            stringResource(R.string.ai_loading),
             fontSize = 14.sp,
             color = Color(0xFF888888)
         )
@@ -288,22 +289,26 @@ fun DownwindWarningCard(typeLabel: String, distText: String, windDir: String) {
     ) {
         Icon(
             imageVector = Icons.Outlined.Warning,
-            contentDescription = "下風處警告",
+            contentDescription = stringResource(R.string.downwind_title),
             tint = Color(0xFFE65100),
             modifier = Modifier.size(24.dp)
         )
         Spacer(Modifier.width(12.dp))
         Column {
             Text(
-                text = "下風處警告",
+                text = stringResource(R.string.downwind_title),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFE65100)
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "您目前位於「$typeLabel」污染熱點的下風處${if (distText.isNotEmpty()) "（$distText）" else ""}。" +
-                       "${if (windDir.isNotEmpty()) "當前吹$windDir，" else ""}污染物可能隨風飄向您所在位置，請注意防護。",
+                text = stringResource(
+                    R.string.downwind_body,
+                    typeLabel,
+                    distText,
+                    if (windDir.isNotEmpty()) stringResource(R.string.downwind_wind_prefix, windDir) else ""
+                ),
                 fontSize = 14.sp,
                 color = Color(0xFF5D4037),
                 lineHeight = 21.sp
@@ -330,30 +335,28 @@ private fun AiSharingDisclosureCard(onAgree: () -> Unit) {
             .padding(16.dp)
     ) {
         Text(
-            "產生個人化建議前",
+            stringResource(R.string.ai_disclosure_title),
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
             color = Color(0xFF333333)
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "AI 顧問會將你在「個人健康檔案」填寫的年齡層與身體狀況，" +
-                "連同所在縣市與當前空氣品質，傳送至本App伺服器並轉交第三方 AI 服務" +
-                "（OpenRouter）以生成建議。",
+            stringResource(R.string.ai_disclosure_body),
             fontSize = 13.sp,
             lineHeight = 20.sp,
             color = Color(0xFF555555)
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "這些資料僅於生成建議當下使用，不會與你的身分建立關聯後保存。",
+            stringResource(R.string.ai_disclosure_retention),
             fontSize = 13.sp,
             lineHeight = 20.sp,
             color = Color(0xFF888888)
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "隱私權政策",
+            stringResource(R.string.privacy_policy),
             fontSize = 13.sp,
             color = OrangeMain,
             textDecoration = TextDecoration.Underline,
@@ -368,7 +371,10 @@ private fun AiSharingDisclosureCard(onAgree: () -> Unit) {
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(containerColor = OrangeMain)
         ) {
-            Text("同意並產生建議", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = White)
+            Text(
+                stringResource(R.string.ai_disclosure_agree),
+                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = White
+            )
         }
     }
 }

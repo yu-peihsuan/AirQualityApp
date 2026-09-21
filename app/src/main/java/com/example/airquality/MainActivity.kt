@@ -1,5 +1,6 @@
 package com.example.airquality
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,20 +11,32 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.annotation.StringRes
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.airquality.data.AppContainer
+import com.example.airquality.data.AppLocale
 import com.example.airquality.ui.theme.*
 
-data class NavItem(val label: String, val iconRes: Int?, val emoji: String? = null)
+data class NavItem(@StringRes val labelRes: Int, val iconRes: Int?, val emoji: String? = null)
 
 class MainActivity : ComponentActivity() {
+
+    /**
+     * 套用設定頁選的介面語言。設定頁改語言後會呼叫 `recreate()`，
+     * Activity 重建時再走一次這裡，整個畫面就會換成新語系。
+     */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -56,11 +69,11 @@ fun MainScreen(initialTab: Int = 0) {
     var openHealthProfile by remember { mutableStateOf(false) }
 
     val navItems = listOf(
-        NavItem("首頁",   R.drawable.home),
-        NavItem("AI顧問", R.drawable.chat_bot),
-        NavItem("通報",   R.drawable.broadcast),
-        NavItem("通知",   R.drawable.alarm),
-        NavItem("設定",   R.drawable.user),
+        NavItem(R.string.nav_home,          R.drawable.home),
+        NavItem(R.string.nav_ai,            R.drawable.chat_bot),
+        NavItem(R.string.nav_report,        R.drawable.broadcast),
+        NavItem(R.string.nav_notifications, R.drawable.alarm),
+        NavItem(R.string.nav_settings,      R.drawable.user),
     )
 
     androidx.compose.material3.Scaffold(
@@ -105,6 +118,7 @@ fun AppBottomBar(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             items.forEachIndexed { index, item ->
+                val label = stringResource(item.labelRes)
                 if (index == 2) {
                     // 中央大按鈕
                     Box(
@@ -118,7 +132,7 @@ fun AppBottomBar(
                         item.iconRes?.let {
                             androidx.compose.foundation.Image(
                                 painter = androidx.compose.ui.res.painterResource(id = it),
-                                contentDescription = item.label,
+                                contentDescription = label,
                                 modifier = Modifier.size(28.dp),
                                 colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(White)
                             )
@@ -134,7 +148,7 @@ fun AppBottomBar(
                         item.iconRes?.let {
                             androidx.compose.foundation.Image(
                                 painter = androidx.compose.ui.res.painterResource(id = it),
-                                contentDescription = item.label,
+                                contentDescription = label,
                                 modifier = Modifier
                                     .size(24.dp)
                                     .padding(bottom = 2.dp),
@@ -145,7 +159,7 @@ fun AppBottomBar(
                         } ?: Text(item.emoji ?: "", fontSize = 23.sp)
                         
                         Text(
-                            item.label,
+                            label,
                             color = if (selectedIndex == index) NavSelected else NavUnselected,
                             fontSize = 13.sp,
                             fontWeight = if (selectedIndex == index) FontWeight.SemiBold else FontWeight.Normal,

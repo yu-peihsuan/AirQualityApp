@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,6 +34,7 @@ import com.example.airquality.data.AppContainer
 import com.example.airquality.data.Coordinates
 import com.example.airquality.data.LocationRepository
 import com.example.airquality.data.LocationResult
+import com.example.airquality.data.Localizer
 import com.example.airquality.data.haversineKm
 import com.example.airquality.ui.theme.*
 
@@ -56,7 +58,8 @@ typealias HotspotUiState = MapUiState
 
 class MapViewModel(
     private val airQuality: AirQualityRepository = AppContainer.airQuality,
-    private val location: LocationRepository = AppContainer.location
+    private val location: LocationRepository = AppContainer.location,
+    private val localizer: Localizer = AppContainer.localizer
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
@@ -102,7 +105,7 @@ class MapViewModel(
                 )
             } catch (e: Exception) {
                 Log.e("MapViewModel", "fetchMapData failed", e)
-                _uiState.value = MapUiState.Error("地圖資料取得失敗")
+                _uiState.value = MapUiState.Error(localizer.string(R.string.map_error))
             }
         }
     }
@@ -149,19 +152,6 @@ class MapViewModel(
             }
         }
     }
-}
-
-// ── 工具：事件類型轉中文 ──────────────────────────────────────────────────────
-
-private fun eventTypeLabel(type: String?): String = when (type) {
-    "fire"                -> "火災/濃煙"
-    "chemical"            -> "化學異味"
-    "dust"                -> "揚塵"
-    "odor"                -> "異味"
-    "vehicle"             -> "車輛廢氣"
-    "factory"             -> "工廠排放"
-    "general_air_quality" -> "空氣品質不良"
-    else                  -> "污染回報"
 }
 
 private fun reportColor(eventType: String?): Color = when (eventType) {
@@ -217,11 +207,11 @@ fun MapScreen(
             .background(BgMain)
     ) {
         AppHeader(
-            title = "污染事件地圖",
+            title = stringResource(R.string.map_title),
             centeredTitle = false,
             actions = {
                 Text(
-                    "返回",
+                    stringResource(R.string.map_back),
                     color = OrangeMain,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
@@ -272,7 +262,7 @@ fun MapScreen(
                         val alpha = viewModel.timeAlpha(alert.publishedAt)
                         MarkerComposable(
                             state   = MarkerState(position = LatLng(lat, lng)),
-                            title   = "🔥 重大火災警示",
+                            title   = stringResource(R.string.map_fire_alert_title),
                             snippet = "${alert.title.take(30)}｜${alert.summary.take(20)}",
                         ) {
                             FireAlertPin(alpha = alpha)
@@ -289,7 +279,7 @@ fun MapScreen(
                         val lng = report.longitude ?: return@forEach
                         val evType  = report.structuredEvent?.eventType
                         val color   = reportColor(evType)
-                        val label   = eventTypeLabel(evType ?: report.category)
+                        val label   = stringResource(eventTypeLabelRes(evType ?: report.category))
                         val snippet = report.summary.take(40).ifBlank { report.region }
                         val alpha   = viewModel.timeAlpha(report.publishedAt)
 
@@ -309,12 +299,12 @@ fun MapScreen(
                             hotspot.intensity >= 0.5 -> Color(0xFFFF6600)
                             else                     -> Color(0xFFFFCC00)
                         }
-                        val typeLabel = eventTypeLabel(hotspot.dominantType)
+                        val typeLabel = stringResource(eventTypeLabelRes(hotspot.dominantType))
                         val windInfo = if (hotspot.isCalmWind) {
-                            "⚠ 擴散條件差（近乎無風）"
+                            stringResource(R.string.map_calm_wind)
                         } else {
-                            val dir = windDirectionLabel(hotspot.windDirection)
-                            "風向：$dir  風速：${hotspot.windSpeed} m/s"
+                            val dir = stringResource(windDirectionLabelRes(hotspot.windDirection))
+                            stringResource(R.string.map_wind_info, dir, hotspot.windSpeed.toString())
                         }
 
                         // 警戒範圍圓：無風時用灰紫色
@@ -330,8 +320,13 @@ fun MapScreen(
                         // 叢集中心標記
                         MarkerComposable(
                             state   = MarkerState(position = LatLng(hotspot.lat, hotspot.lng)),
-                            title   = "$typeLabel（${hotspot.count} 筆回報）",
-                            snippet = "強度：${(hotspot.intensity * 100).toInt()}%  範圍：${hotspot.radiusKm} km｜$windInfo",
+                            title   = stringResource(R.string.map_hotspot_title, typeLabel, hotspot.count),
+                            snippet = stringResource(
+                                R.string.map_hotspot_snippet,
+                                (hotspot.intensity * 100).toInt(),
+                                hotspot.radiusKm.toString(),
+                                windInfo
+                            ),
                         ) {
                             HotspotMarker(count = hotspot.count, color = markerColor, isCalmWind = hotspot.isCalmWind)
                         }
@@ -374,7 +369,7 @@ fun MapScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        "未開啟定位權限，地圖不會標出你的位置；可於首頁改選常用地點",
+                        stringResource(R.string.map_location_note),
                         color = TextMid, fontSize = 13.sp
                     )
                 }
@@ -392,7 +387,7 @@ fun MapScreen(
                             .background(Color.White.copy(alpha = 0.9f))
                             .padding(horizontal = 20.dp, vertical = 10.dp)
                     ) {
-                        Text("目前尚無回報資料", color = TextMid, fontSize = 14.sp)
+                        Text(stringResource(R.string.map_no_reports), color = TextMid, fontSize = 14.sp)
                     }
                 }
             }
@@ -416,7 +411,7 @@ fun MapScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text("圖例", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                            Text(stringResource(R.string.map_legend), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
                             Text(
                                 if (legendExpanded) "▲" else "▼",
                                 fontSize = 9.sp,
@@ -426,25 +421,25 @@ fun MapScreen(
                         if (legendExpanded) {
                             if (data.fireAlerts.isNotEmpty()) {
                                 Spacer(Modifier.height(2.dp))
-                                Text("— 消防署火災警示", fontSize = 10.sp, color = TextGray)
-                                LegendItem(Color(0xFFB71C1C), "重大火災", circle = false, isFireAlert = true)
+                                Text(stringResource(R.string.map_legend_fire_section), fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFB71C1C), stringResource(R.string.map_legend_major_fire), circle = false, isFireAlert = true)
                             }
                             if (data.hotspots.isNotEmpty()) {
                                 Spacer(Modifier.height(2.dp))
-                                Text("— 熱點叢集", fontSize = 10.sp, color = TextGray)
-                                LegendItem(Color(0xFFE53935), "高強度 ≥ 80%", circle = true)
-                                LegendItem(Color(0xFFFF6600), "中強度 ≥ 50%", circle = true)
-                                LegendItem(Color(0xFFFFCC00), "低強度 < 50%", circle = true)
-                                LegendItem(Color(0xFF6A1B9A), "擴散條件差（無風）", circle = true)
+                                Text(stringResource(R.string.map_legend_cluster_section), fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFE53935), stringResource(R.string.map_legend_high), circle = true)
+                                LegendItem(Color(0xFFFF6600), stringResource(R.string.map_legend_mid),  circle = true)
+                                LegendItem(Color(0xFFFFCC00), stringResource(R.string.map_legend_low),  circle = true)
+                                LegendItem(Color(0xFF6A1B9A), stringResource(R.string.map_legend_calm), circle = true)
                             }
                             if (data.reports.isNotEmpty()) {
                                 Spacer(Modifier.height(2.dp))
-                                Text("— 個別回報", fontSize = 10.sp, color = TextGray)
-                                LegendItem(Color(0xFFE53935), "火災/濃煙",   circle = false)
-                                LegendItem(Color(0xFF8E24AA), "化學異味",    circle = false)
-                                LegendItem(Color(0xFFFF8F00), "揚塵",        circle = false)
-                                LegendItem(Color(0xFF00897B), "異味",        circle = false)
-                                LegendItem(Color(0xFF546E7A), "車輛/工廠",   circle = false)
+                                Text(stringResource(R.string.map_legend_report_section), fontSize = 10.sp, color = TextGray)
+                                LegendItem(Color(0xFFE53935), stringResource(R.string.event_fire),     circle = false)
+                                LegendItem(Color(0xFF8E24AA), stringResource(R.string.event_chemical), circle = false)
+                                LegendItem(Color(0xFFFF8F00), stringResource(R.string.event_dust),     circle = false)
+                                LegendItem(Color(0xFF00897B), stringResource(R.string.event_odor),     circle = false)
+                                LegendItem(Color(0xFF546E7A), stringResource(R.string.map_legend_vehicle_factory), circle = false)
                             }
                         }
                     }
@@ -454,11 +449,12 @@ fun MapScreen(
     }
 }
 
-// ── 風向角度轉中文方位 ─────────────────────────────────────────────────────────
+// ── 風向角度轉方位 ─────────────────────────────────
 
-private fun windDirectionLabel(deg: Double): String = when ((deg + 22.5).toInt() / 45 % 8) {
-    0 -> "北"; 1 -> "東北"; 2 -> "東"; 3 -> "東南"
-    4 -> "南"; 5 -> "西南"; 6 -> "西"; else -> "西北"
+@androidx.annotation.StringRes
+private fun windDirectionLabelRes(deg: Double): Int = when ((deg + 22.5).toInt() / 45 % 8) {
+    0 -> R.string.compass_n;  1 -> R.string.compass_ne; 2 -> R.string.compass_e;  3 -> R.string.compass_se
+    4 -> R.string.compass_s;  5 -> R.string.compass_sw; 6 -> R.string.compass_w;  else -> R.string.compass_nw
 }
 
 // ── 消防署火災警示 Pin ─────────────────────────────────────────────────────────

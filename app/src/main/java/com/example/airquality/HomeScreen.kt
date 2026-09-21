@@ -1,5 +1,6 @@
 package com.example.airquality
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -56,8 +58,11 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.annotation.StringRes
+import com.example.airquality.data.HealthOptions
 import com.example.airquality.ui.theme.*
-import java.util.Calendar
+import java.text.SimpleDateFormat
+import java.util.Date
 
 @Composable
 fun HomeScreen(
@@ -87,7 +92,7 @@ fun HomeScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // 管理當前顯示的日期，讓它可以在回到畫面時更新
-    var currentDateString by remember { mutableStateOf(getCurrentDateString()) }
+    var currentDateString by remember { mutableStateOf(getCurrentDateString(context)) }
 
     // 權限請求 launcher：權限流程結束後，一律依「持久化的選擇」載入——
     // 手動選過地區就用該地區（與定位權限無關）；GPS 模式才看定位權限，
@@ -101,7 +106,7 @@ fun HomeScreen(
         // 未授權定位、也沒選過任何地區 → 引導使用者必須自行選擇一個常用地點
         if (!viewModel.hasLocationPermission() && !viewModel.hasSavedChoice()) {
             // Toast 於 Android 12+ 僅顯示兩行，文字須精簡避免被截斷
-            Toast.makeText(context, "未開啟定位，請選擇常用地點", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, R.string.home_toast_location_off, Toast.LENGTH_LONG).show()
             showLocationDialog = true
         }
     }
@@ -115,7 +120,7 @@ fun HomeScreen(
             viewModel.switchToGps()
         } else {
             // Toast 於 Android 12+ 僅顯示兩行，文字須精簡避免被截斷
-            Toast.makeText(context, "未取得定位權限，請至系統設定開啟", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, R.string.home_toast_location_denied, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -156,7 +161,7 @@ fun HomeScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                currentDateString = getCurrentDateString()
+                currentDateString = getCurrentDateString(context)
                 if (skipFirstResume) {
                     skipFirstResume = false
                 } else {
@@ -170,7 +175,7 @@ fun HomeScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
 
         // 初始載入由上方 LaunchedEffect／權限回呼統一處理（單一決策點）
-        currentDateString = getCurrentDateString()
+        currentDateString = getCurrentDateString(context)
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -184,9 +189,9 @@ fun HomeScreen(
     ) {
         val locationText = if (uiState is AqiUiState.Success) {
             val nearest = (uiState as AqiUiState.Success).nearestRecord
-            "鄰近測站: ${nearest.sitename}"
+            stringResource(R.string.home_nearest_station, nearest.sitename)
         } else {
-            "鄰近測站: 搜尋中..."
+            stringResource(R.string.home_nearest_station_searching)
         }
 
         HomeAppHeader(
@@ -223,13 +228,16 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("切換地點", fontWeight = FontWeight.Bold, color = TextDark)
+                        Text(
+                            stringResource(R.string.home_switch_location),
+                            fontWeight = FontWeight.Bold, color = TextDark
+                        )
                         androidx.compose.material3.TextButton(onClick = {
                             addLocName = ""
                             addLocAddress = ""
                             showAddLocationDialog = true
                         }) {
-                            Text("＋ 新增", color = OrangeMain, fontSize = 14.sp)
+                            Text(stringResource(R.string.action_add), color = OrangeMain, fontSize = 14.sp)
                         }
                     }
                 },
@@ -241,8 +249,9 @@ fun HomeScreen(
                         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
                     ) {
                         LocationOption(
-                            "GPS 定位", "自動偵測目前位置",
-                            selected = currentLocationName == "GPS 定位"
+                            stringResource(R.string.location_gps),
+                            stringResource(R.string.location_gps_subtitle),
+                            selected = currentLocationName == HomeViewModel.GPS_MODE_NAME
                         ) {
                             showLocationDialog = false
                             if (viewModel.hasLocationPermission()) {
@@ -265,7 +274,7 @@ fun HomeScreen(
                             }
                         }
                         if (favLocations.isEmpty()) {
-                            Text("尚未設定常用地點，點右上「＋ 新增」即可加入。",
+                            Text(stringResource(R.string.home_no_favorites),
                                 color = TextGray, fontSize = 13.sp,
                                 modifier = androidx.compose.ui.Modifier.padding(top = 8.dp))
                         }
@@ -280,14 +289,24 @@ fun HomeScreen(
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { showAddLocationDialog = false },
                 containerColor = BgMain,
-                title = { Text("新增常用地點", fontWeight = FontWeight.Bold, color = TextDark) },
+                title = {
+                    Text(
+                        stringResource(R.string.location_add_title),
+                        fontWeight = FontWeight.Bold, color = TextDark
+                    )
+                },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         androidx.compose.material3.OutlinedTextField(
                             value = addLocName,
                             onValueChange = { addLocName = it },
-                            label = { Text("名稱") },
-                            placeholder = { Text("例如：家、公司", color = TextGray, fontSize = 13.sp) },
+                            label = { Text(stringResource(R.string.location_name_label)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.location_name_hint_short),
+                                    color = TextGray, fontSize = 13.sp
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
                             singleLine = true
@@ -295,8 +314,13 @@ fun HomeScreen(
                         androidx.compose.material3.OutlinedTextField(
                             value = addLocAddress,
                             onValueChange = { addLocAddress = it },
-                            label = { Text("地址") },
-                            placeholder = { Text("例如：台北市中正區重慶南路一段122號", color = TextGray, fontSize = 13.sp) },
+                            label = { Text(stringResource(R.string.location_address_label)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.location_address_hint_full),
+                                    color = TextGray, fontSize = 13.sp
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
                             singleLine = true
@@ -313,13 +337,13 @@ fun HomeScreen(
                             showLocationDialog = false
                             viewModel.addFavoriteAndSwitch(n, a)
                         } else {
-                            Toast.makeText(context, "請填寫名稱與地址", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.location_fill_both, Toast.LENGTH_SHORT).show()
                         }
-                    }) { Text("儲存並切換", color = OrangeMain) }
+                    }) { Text(stringResource(R.string.location_save_and_switch), color = OrangeMain) }
                 },
                 dismissButton = {
                     androidx.compose.material3.TextButton(onClick = { showAddLocationDialog = false }) {
-                        Text("取消", color = TextGray)
+                        Text(stringResource(R.string.action_cancel), color = TextGray)
                     }
                 }
             )
@@ -344,7 +368,7 @@ fun HomeScreen(
                     ) {
                         CircularProgressIndicator(color = OrangeMain)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("正在取得空氣品質資料...", color = TextGray, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.home_loading), color = TextGray, textAlign = TextAlign.Center)
                     }
                 }
                 
@@ -374,7 +398,7 @@ fun HomeScreen(
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                "⚠ 網路連線異常，顯示暫存資料",
+                                stringResource(R.string.home_cached_banner),
                                 fontSize = 12.sp,
                                 color = Color(0xFF856404)
                             )
@@ -383,20 +407,15 @@ fun HomeScreen(
                     }
 
                     val aqiValue = nearestRecord.aqi
-                    val aqiStatus = nearestRecord.status
-                    val aqiColor = getAqiColor(aqiStatus)
-                    val displayStatus = when (aqiStatus) {
-                        "對敏感族群不健康", "對所有族群不健康" -> "不健康"
-                        else -> aqiStatus
-                    }
-                    val pm25 = nearestRecord.pm25
-                    val sitename = nearestRecord.sitename
+                    val aqiLevel = AqiLevel.of(nearestRecord.status, aqiValue.toIntOrNull())
+                    val aqiColor = aqiLevel.color
+                    val displayStatus = stringResource(aqiLevel.shortLabelRes)
                     
                     // ── 空氣品質標題 ──────────────────────────────────
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             buildAnnotatedString {
-                                append("空氣")
+                                append(stringResource(R.string.home_air_prefix))
                                 withStyle(SpanStyle(color = aqiColor)) { append(displayStatus) }
                             },
                             fontSize = 48.sp,
@@ -412,7 +431,11 @@ fun HomeScreen(
                         } else {
                             "12:00"
                         }
-                        Text("更新時間 $updateTimeStr", color = TextGray, fontSize = 18.sp, modifier = Modifier.padding(top = 8.dp))
+                        Text(
+                            stringResource(R.string.home_update_time, updateTimeStr),
+                            color = TextGray, fontSize = 18.sp,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
 
                     Spacer(Modifier.height(40.dp)) // 增加文字與臉的間距
@@ -431,7 +454,10 @@ fun HomeScreen(
                                 .border(1.dp, aqiColor.copy(alpha = 0.5f), RoundedCornerShape(50))
                                 .padding(horizontal = 30.dp, vertical = 14.dp) // AQI標籤加大
                         ) {
-                            Text("AQI $aqiValue $displayStatus", color = aqiColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) // 文字再加大
+                            Text(
+                                stringResource(R.string.home_aqi_badge, aqiValue, displayStatus),
+                                color = aqiColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
 
@@ -439,8 +465,8 @@ fun HomeScreen(
 
                     // ── 行動按鈕（依 AQI 等級與健康檔案隨機抽 3 個）────
                     val currentAqiInt = aqiValue.toIntOrNull() ?: 0
-                    val hasAsthma        = "氣喘" in conditions
-                    val hasCardiovascular = "心血管疾病" in conditions
+                    val hasAsthma         = HealthOptions.ASTHMA in conditions
+                    val hasCardiovascular = HealthOptions.CARDIOVASCULAR in conditions
                     val aqiBand = when {
                         currentAqiInt <= 50  -> 0
                         currentAqiInt <= 100 -> 1
@@ -454,8 +480,8 @@ fun HomeScreen(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        chips.forEach { (icon, label) ->
-                            ActionChip(icon, label, aqiColor, Modifier.weight(1f))
+                        chips.forEach { chip ->
+                            ActionChip(chip.icon, stringResource(chip.labelRes), aqiColor, Modifier.weight(1f))
                         }
                     }
                 }
@@ -653,7 +679,7 @@ private fun LocationOption(
         }
         if (selected) {
             Spacer(Modifier.width(6.dp))
-            Text("✓ 目前", fontSize = 12.sp, color = OrangeMain,
+            Text(stringResource(R.string.location_current_marker), fontSize = 12.sp, color = OrangeMain,
                 fontWeight = FontWeight.Medium, maxLines = 1)
         }
     }
@@ -661,7 +687,7 @@ private fun LocationOption(
 
 // ── 行動建議資料類別 ──────────────────────────────────────────────────────────
 
-private data class ChipItem(val icon: Int, val label: String, val category: String = label)
+private data class ChipItem(@StringRes val labelRes: Int, val icon: Int, val category: String)
 
 private fun getActionChips(
     aqiBand: Int,
@@ -674,80 +700,72 @@ private fun getActionChips(
         0 -> {
             if (isRaining) {
                 pool += listOf(
-                    ChipItem(R.drawable.excercise_inside, "室內運動",  "indoor_exercise"),
-                    ChipItem(R.drawable.yoga,             "瑜珈伸展",  "indoor_exercise"),
-                    ChipItem(R.drawable.open_window,      "開窗通風",  "ventilation"),
+                    ChipItem(R.string.chip_indoor_exercise, R.drawable.excercise_inside, "indoor_exercise"),
+                    ChipItem(R.string.chip_yoga,            R.drawable.yoga,             "indoor_exercise"),
+                    ChipItem(R.string.chip_ventilation,     R.drawable.open_window,      "ventilation"),
                 )
             } else {
                 pool += listOf(
-                    ChipItem(R.drawable.jogging,         "戶外跑步",  "outdoor_exercise"),
-                    ChipItem(R.drawable.walking_outside, "戶外散步",  "outdoor_exercise"),
-                    ChipItem(R.drawable.bicycle,         "騎腳踏車",  "cycling"),
-                    ChipItem(R.drawable.open_window,     "開窗通風",  "ventilation"),
+                    ChipItem(R.string.chip_jogging,     R.drawable.jogging,         "outdoor_exercise"),
+                    ChipItem(R.string.chip_walking,     R.drawable.walking_outside, "outdoor_exercise"),
+                    ChipItem(R.string.chip_cycling,     R.drawable.bicycle,         "cycling"),
+                    ChipItem(R.string.chip_ventilation, R.drawable.open_window,     "ventilation"),
                 )
             }
         }
         1 -> {
             if (isRaining) {
                 pool += listOf(
-                    ChipItem(R.drawable.excercise_inside, "室內運動",  "indoor_exercise"),
-                    ChipItem(R.drawable.yoga,             "瑜珈伸展",  "indoor_exercise"),
-                    ChipItem(R.drawable.drink_water,      "補充水分",  "hydration"),
-                    ChipItem(R.drawable.air_purifier,     "空氣清淨機","air_purifier"),
+                    ChipItem(R.string.chip_indoor_exercise, R.drawable.excercise_inside, "indoor_exercise"),
+                    ChipItem(R.string.chip_yoga,            R.drawable.yoga,             "indoor_exercise"),
+                    ChipItem(R.string.chip_hydration,       R.drawable.drink_water,      "hydration"),
+                    ChipItem(R.string.chip_air_purifier,    R.drawable.air_purifier,     "air_purifier"),
                 )
             } else {
                 pool += listOf(
-                    ChipItem(R.drawable.walking_outside, "戶外散步",  "outdoor_exercise"),
-                    ChipItem(R.drawable.open_window,     "開窗通風",  "ventilation"),
-                    ChipItem(R.drawable.drink_water,     "補充水分",  "hydration"),
-                    ChipItem(R.drawable.air_purifier,    "空氣清淨機","air_purifier"),
+                    ChipItem(R.string.chip_walking,      R.drawable.walking_outside, "outdoor_exercise"),
+                    ChipItem(R.string.chip_ventilation,  R.drawable.open_window,     "ventilation"),
+                    ChipItem(R.string.chip_hydration,    R.drawable.drink_water,     "hydration"),
+                    ChipItem(R.string.chip_air_purifier, R.drawable.air_purifier,    "air_purifier"),
                 )
             }
         }
         2 -> {
             pool += listOf(
-                ChipItem(R.drawable.mask,             "戴口罩",    "mask"),
-                ChipItem(R.drawable.window,           "關閉門窗",  "close_window"),
-                ChipItem(R.drawable.stay_at_home,     "減少外出",  "stay_inside"),
-                ChipItem(R.drawable.drink_water,      "補充水分",  "hydration"),
-                ChipItem(R.drawable.excercise_inside, "室內運動",  "indoor_exercise"),
-                ChipItem(R.drawable.yoga,             "瑜珈伸展",  "indoor_exercise"),
-                ChipItem(R.drawable.public_transport, "搭大眾運輸","transport"),
-                ChipItem(R.drawable.air_purifier,     "空氣清淨機","air_purifier"),
+                ChipItem(R.string.chip_mask,             R.drawable.mask,             "mask"),
+                ChipItem(R.string.chip_close_window,     R.drawable.window,           "close_window"),
+                ChipItem(R.string.chip_go_out_less,      R.drawable.stay_at_home,     "stay_inside"),
+                ChipItem(R.string.chip_hydration,        R.drawable.drink_water,      "hydration"),
+                ChipItem(R.string.chip_indoor_exercise,  R.drawable.excercise_inside, "indoor_exercise"),
+                ChipItem(R.string.chip_yoga,             R.drawable.yoga,             "indoor_exercise"),
+                ChipItem(R.string.chip_public_transport, R.drawable.public_transport, "transport"),
+                ChipItem(R.string.chip_air_purifier,     R.drawable.air_purifier,     "air_purifier"),
             )
-            if (hasAsthma)         pool += ChipItem(R.drawable.inhaler, "備妥吸入器", "inhaler")
-            if (hasCardiovascular) pool += ChipItem(R.drawable.medicine, "備妥藥物",  "medicine")
+            if (hasAsthma)         pool += ChipItem(R.string.chip_inhaler,  R.drawable.inhaler,  "inhaler")
+            if (hasCardiovascular) pool += ChipItem(R.string.chip_medicine, R.drawable.medicine, "medicine")
         }
         else -> {
             pool += listOf(
-                ChipItem(R.drawable.mask,             "戴口罩",    "mask"),
-                ChipItem(R.drawable.window,           "關閉門窗",  "close_window"),
-                ChipItem(R.drawable.air_purifier,     "空氣清淨機","air_purifier"),
-                ChipItem(R.drawable.home,             "盡量待室內","stay_inside"),
-                ChipItem(R.drawable.drink_water,      "多補充水分","hydration"),
-                ChipItem(R.drawable.public_transport, "搭大眾運輸","transport"),
+                ChipItem(R.string.chip_mask,             R.drawable.mask,             "mask"),
+                ChipItem(R.string.chip_close_window,     R.drawable.window,           "close_window"),
+                ChipItem(R.string.chip_air_purifier,     R.drawable.air_purifier,     "air_purifier"),
+                ChipItem(R.string.chip_stay_inside,      R.drawable.home,             "stay_inside"),
+                ChipItem(R.string.chip_hydration_more,   R.drawable.drink_water,      "hydration"),
+                ChipItem(R.string.chip_public_transport, R.drawable.public_transport, "transport"),
             )
-            if (hasAsthma)         pool += ChipItem(R.drawable.inhaler, "備妥吸入器", "inhaler")
-            if (hasCardiovascular) pool += ChipItem(R.drawable.medicine, "備妥藥物",  "medicine")
+            if (hasAsthma)         pool += ChipItem(R.string.chip_inhaler,  R.drawable.inhaler,  "inhaler")
+            if (hasCardiovascular) pool += ChipItem(R.string.chip_medicine, R.drawable.medicine, "medicine")
         }
     }
     return pool.shuffled().distinctBy { it.category }.take(3)
 }
 
-//取得當下時間
-fun getCurrentDateString(): String {
-    val calendar = Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Taipei"))
-    val month = calendar.get(Calendar.MONTH) + 1
-    val day = calendar.get(Calendar.DAY_OF_MONTH)
-    val dayOfWeek = when (calendar.get(Calendar.DAY_OF_WEEK)) {
-        Calendar.SUNDAY -> "週日"
-        Calendar.MONDAY -> "週一"
-        Calendar.TUESDAY -> "週二"
-        Calendar.WEDNESDAY -> "週三"
-        Calendar.THURSDAY -> "週四"
-        Calendar.FRIDAY -> "週五"
-        Calendar.SATURDAY -> "週六"
-        else -> ""
-    }
-    return "${month}月${day}日 $dayOfWeek"
+// 取得當下日期的顯示字串。
+// 格式寫在字串資源裡（zh-TW 是「9月21日 週日」、en 是「Sun, Sep 21」），
+// 週幾的寫法交給 SimpleDateFormat 依語系產生，不再自己維護一張對照表。
+fun getCurrentDateString(context: Context): String {
+    val locale = context.resources.configuration.locales[0]
+    val formatter = SimpleDateFormat(context.getString(R.string.home_date_pattern), locale)
+    formatter.timeZone = java.util.TimeZone.getTimeZone("Asia/Taipei")
+    return formatter.format(Date())
 }

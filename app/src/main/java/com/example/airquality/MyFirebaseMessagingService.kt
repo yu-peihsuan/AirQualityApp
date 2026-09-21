@@ -21,7 +21,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
-        val title = remoteMessage.notification?.title ?: remoteMessage.data["title"] ?: "空氣品質警報"
+        val title = remoteMessage.notification?.title ?: remoteMessage.data["title"] ?: getString(R.string.notification_default_title)
         val body  = remoteMessage.notification?.body  ?: remoteMessage.data["body"]  ?: ""
         showNotification(title, body)
     }
@@ -42,7 +42,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "空氣品質警報",
+                getString(R.string.notification_channel_name),
                 NotificationManager.IMPORTANCE_HIGH
             )
             notificationManager.createNotificationChannel(channel)
