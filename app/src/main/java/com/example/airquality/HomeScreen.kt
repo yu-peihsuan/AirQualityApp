@@ -608,7 +608,6 @@ fun ActionChip(iconRes: Int, label: String, color: Color, modifier: Modifier = M
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .background(color.copy(alpha = 0.15f)) // 背景依 AQI 顏色透明化
-            .clickable {}
             .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(20.dp)) // 外框依 AQI 顏色
             .defaultMinSize(minHeight = 130.dp)
             .padding(horizontal = 4.dp, vertical = 10.dp)
