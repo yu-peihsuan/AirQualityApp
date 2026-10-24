@@ -44,6 +44,8 @@ fun AiHealthScreen(
 
     val hasConsented by homeViewModel.hasConsentedToAiSharing.collectAsState()
 
+    val currentLocationName by homeViewModel.currentLocationName.collectAsState()
+
     // 已同意過才自動產生。首次進來一定要由使用者按下按鈕——健康屬性會轉交
     // 第三方（OpenRouter），Google Play 要求在送出前於畫面上揭露並取得肯定操作。
     LaunchedEffect(aqiState, hasConsented) {
@@ -58,7 +60,13 @@ fun AiHealthScreen(
             .background(Color(0xFFFFFFFF))
     ) {
         // ── Header ──────────────────────────────────────────────────────────
-        AppHeader(title = "AI 健康顧問", centeredTitle = true, fontSize = 18.sp)
+        // 副標題標出建議所依據的地點，避免使用者忘了切回目前位置而誤用別處的建議
+        AppHeader(
+            title = "AI 健康顧問",
+            subtitle = adviceLocationLabel(aqiState, homeViewModel.isGpsMode, currentLocationName),
+            centeredTitle = true,
+            fontSize = 18.sp
+        )
 
         // ── 主要內容 ────────────────────────────────────────────────────────
         Column(
@@ -162,7 +170,7 @@ fun AiHealthScreen(
             // ── 重新取得建議按鈕 ──────────────────────────────────────────
             // 尚未同意前不顯示——否則等於繞過上方那張揭露卡直接送出資料
             OutlinedButton(
-                onClick = { homeViewModel.fetchRagAdvice() },
+                onClick = { homeViewModel.fetchRagAdvice(force = true) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
                 enabled = hasConsented && ragAdviceState !is RagAdviceUiState.Loading
@@ -182,6 +190,13 @@ fun AiHealthScreen(
 }
 
 // ── 元件 ──────────────────────────────────────────────────────────────────────
+
+/** 「自動定位(中山測站)」或「家(苗栗測站)」；首頁還在載入時顯示定位中。 */
+private fun adviceLocationLabel(aqiState: AqiUiState, isGpsMode: Boolean, currentLocationName: String): String {
+    val success = aqiState as? AqiUiState.Success ?: return "定位中"
+    val source = if (isGpsMode) "自動定位" else currentLocationName
+    return "$source(${success.nearestRecord.sitename}測站)"
+}
 
 @Composable
 fun HealthAdviceCard(message: ChatMessage) {

@@ -366,7 +366,8 @@ fun HomeScreen(
                         AppIconManager.recordAqi(context, nearestRecord.aqi.toIntOrNull())
                     }
 
-                    if (successState.isFromCache) {
+                    val cacheNotice = successState.cacheNotice
+                    if (cacheNotice != null) {
                         Box(
                             Modifier
                                 .fillMaxWidth()
@@ -374,7 +375,7 @@ fun HomeScreen(
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                "⚠ 網路連線異常，顯示暫存資料",
+                                "⚠ $cacheNotice",
                                 fontSize = 12.sp,
                                 color = Color(0xFF856404)
                             )
@@ -608,7 +609,6 @@ fun ActionChip(iconRes: Int, label: String, color: Color, modifier: Modifier = M
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .background(color.copy(alpha = 0.15f)) // 背景依 AQI 顏色透明化
-            .clickable {}
             .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(20.dp)) // 外框依 AQI 顏色
             .defaultMinSize(minHeight = 130.dp)
             .padding(horizontal = 4.dp, vertical = 10.dp)

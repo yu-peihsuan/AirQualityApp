@@ -1,5 +1,6 @@
 package com.example.airquality
 
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.round
 
 sealed class AqiUiState {
     object Loading : AqiUiState()
@@ -28,7 +30,8 @@ sealed class AqiUiState {
         val data: AirQualityResponse,
         val nearestRecord: AqiRecord,
         val displayRegion: String,
-        val isFromCache: Boolean = false
+        /** 不是最新資料時給使用者看的說明（原因與資料時間）；最新資料為 null。 */
+        val cacheNotice: String? = null
     ) : AqiUiState()
     data class Error(val message: String) : AqiUiState()
 }
@@ -70,6 +73,10 @@ class HomeViewModel(
 
     private val _ragAdviceState = MutableStateFlow<RagAdviceUiState>(RagAdviceUiState.Idle)
     val ragAdviceState: StateFlow<RagAdviceUiState> = _ragAdviceState.asStateFlow()
+
+    // 上一次送出的 AI 建議請求與成功時間，用來略過重複生成（見 fetchRagAdvice）
+    private var lastRagRequestKey: RagAdviceRequest? = null
+    private var lastRagAdviceAt = 0L
 
     private val _isRaining = MutableStateFlow(false)
     val isRaining: StateFlow<Boolean> = _isRaining.asStateFlow()
@@ -235,7 +242,8 @@ class HomeViewModel(
             data = response,
             nearestRecord = nearest,
             displayRegion = displayRegion,
-            isFromCache = response.status == "cached"
+            // 後端在環境部連不上時改回快取，message 會寫明原因與是幾分鐘前的資料
+            cacheNotice = if (response.status == "cached") response.message else null
         )
         lastSuccessState = successState
         _uiState.value = successState
@@ -256,7 +264,7 @@ class HomeViewModel(
         val cached = lastSuccessState
         if (cached != null) {
             Log.w(TAG, "$logMessage，改用快取資料：${cause.localizedMessage}")
-            _uiState.value = cached.copy(isFromCache = true)
+            _uiState.value = cached.copy(cacheNotice = cached.cacheNotice ?: "網路連線異常，顯示先前的資料")
         } else {
             Log.e(TAG, logMessage, cause)
             _uiState.value = AqiUiState.Error("$userFacing: ${cause.localizedMessage}")
@@ -265,24 +273,46 @@ class HomeViewModel(
 
     // ── AI 建議 ───────────────────────────────────────────────────────────
 
-    fun fetchRagAdvice() {
+    /**
+     * 產生 AI 建議。
+     *
+     * AI 頁每次進入、首頁每次回到前景重新整理都會觸發，但一次生成要等好幾秒
+     * （後端要查測站、天氣、事件再呼叫 LLM）。輸入（地點、AQI、健康檔案）沒變
+     * 且結果還新鮮時直接沿用上次的建議；[force] 給「重新取得」按鈕用。
+     */
+    fun fetchRagAdvice(force: Boolean = false) {
+        // 健康屬性僅在使用者主動使用 AI 建議時送出（見隱私權政策第二節）
+        val userProfile = healthProfile.toRagUserProfile()
+
+        // 所在縣市與 AQI 直接取自目前的成功狀態，避免重複呼叫 API
+        val success = _uiState.value as? AqiUiState.Success
+        val request = RagAdviceRequest(
+            county = success?.nearestRecord?.county?.ifBlank { DEFAULT_REGION } ?: DEFAULT_REGION,
+            latitude = userCoordinates?.lat,
+            longitude = userCoordinates?.lng,
+            aqi = success?.nearestRecord?.aqi?.toIntOrNull(),
+            pm25 = success?.nearestRecord?.pm25?.toDoubleOrNull(),
+            userProfile = userProfile
+        )
+
+        // GPS 每次定位都會飄移幾公尺，座標取到小數第 3 位（約 100 公尺）再比對，
+        // 人沒移動就視為同一個位置；送出的請求仍用原始座標
+        val requestKey = request.copy(
+            latitude = request.latitude?.let { round(it * 1000) / 1000 },
+            longitude = request.longitude?.let { round(it * 1000) / 1000 }
+        )
+        val current = _ragAdviceState.value
+        val isFresh = SystemClock.elapsedRealtime() - lastRagAdviceAt < RAG_ADVICE_TTL_MS
+        if (!force && requestKey == lastRagRequestKey &&
+            (current is RagAdviceUiState.Loading || (current is RagAdviceUiState.Success && isFresh))
+        ) return
+
+        lastRagRequestKey = requestKey
         viewModelScope.launch {
             _ragAdviceState.value = RagAdviceUiState.Loading
             try {
-                // 健康屬性僅在使用者主動使用 AI 建議時送出（見隱私權政策第二節）
-                val userProfile = healthProfile.toRagUserProfile()
-
-                // 所在縣市與 AQI 直接取自目前的成功狀態，避免重複呼叫 API
-                val success = _uiState.value as? AqiUiState.Success
-                val request = RagAdviceRequest(
-                    county = success?.nearestRecord?.county?.ifBlank { DEFAULT_REGION } ?: DEFAULT_REGION,
-                    latitude = userCoordinates?.lat,
-                    longitude = userCoordinates?.lng,
-                    aqi = success?.nearestRecord?.aqi?.toIntOrNull(),
-                    pm25 = success?.nearestRecord?.pm25?.toDoubleOrNull(),
-                    userProfile = userProfile
-                )
                 _ragAdviceState.value = RagAdviceUiState.Success(airQuality.ragAdvice(request))
+                lastRagAdviceAt = SystemClock.elapsedRealtime()
             } catch (e: Exception) {
                 Log.e(TAG, "fetchRagAdvice failed", e)
                 _ragAdviceState.value = RagAdviceUiState.Error("AI 建議取得失敗: ${e.localizedMessage}")
@@ -324,6 +354,7 @@ class HomeViewModel(
         const val TAG = "HomeViewModel"
         const val GPS_MODE_NAME = "GPS 定位"
         const val DEFAULT_REGION = "台北市"
+        const val RAG_ADVICE_TTL_MS = 30 * 60 * 1000L
         // 預設位置：台北市中心（北緯 25°05'14"、東經 121°33'20"）
         val DEFAULT_COORDINATES = Coordinates(25.087222, 121.555556)
     }
