@@ -86,6 +86,7 @@ open class FcmTokenRepository(
                 return SyncResult.Failure(response.message)
             }
             rememberLocation(effectiveCounty, effectiveCoords)
+            resyncDailyNotification()
             SyncResult.Success
         } catch (e: Exception) {
             Log.w(TAG, "推播註冊失敗：${e.message}")
@@ -105,6 +106,21 @@ open class FcmTokenRepository(
         } catch (e: Exception) {
             SyncResult.Failure(e.localizedMessage ?: "連線失敗")
         }
+    }
+
+    /**
+     * 註冊成功後重送每日通知設定。
+     *
+     * 這份設定原本只在使用者於設定頁改動時送一次，後端一旦弄丟（伺服器資料
+     * 重置）或 token 輪替成新的一筆，就再也收不到每日通知，畫面上卻仍顯示
+     * 「已開啟」。每次註冊都順帶重送，讓後端與本機設定保持一致。
+     */
+    private suspend fun resyncDailyNotification() {
+        if (!notificationSettings.dailyEnabled) return
+        val result = setDailyNotification(
+            true, notificationSettings.dailyHour, notificationSettings.dailyMinute
+        )
+        if (result is SyncResult.Failure) Log.w(TAG, "每日通知設定重送失敗：${result.message}")
     }
 
     /** 立刻推一則測試通知；成功時回傳給使用者看的描述。 */
