@@ -366,7 +366,8 @@ fun HomeScreen(
                         AppIconManager.recordAqi(context, nearestRecord.aqi.toIntOrNull())
                     }
 
-                    if (successState.isFromCache) {
+                    val cacheNotice = successState.cacheNotice
+                    if (cacheNotice != null) {
                         Box(
                             Modifier
                                 .fillMaxWidth()
@@ -374,7 +375,7 @@ fun HomeScreen(
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                "⚠ 網路連線異常，顯示暫存資料",
+                                "⚠ $cacheNotice",
                                 fontSize = 12.sp,
                                 color = Color(0xFF856404)
                             )

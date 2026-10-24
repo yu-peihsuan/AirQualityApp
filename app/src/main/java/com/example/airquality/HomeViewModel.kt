@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.round
 
 sealed class AqiUiState {
     object Loading : AqiUiState()
@@ -29,7 +30,8 @@ sealed class AqiUiState {
         val data: AirQualityResponse,
         val nearestRecord: AqiRecord,
         val displayRegion: String,
-        val isFromCache: Boolean = false
+        /** 不是最新資料時給使用者看的說明（原因與資料時間）；最新資料為 null。 */
+        val cacheNotice: String? = null
     ) : AqiUiState()
     data class Error(val message: String) : AqiUiState()
 }
@@ -73,7 +75,7 @@ class HomeViewModel(
     val ragAdviceState: StateFlow<RagAdviceUiState> = _ragAdviceState.asStateFlow()
 
     // 上一次送出的 AI 建議請求與成功時間，用來略過重複生成（見 fetchRagAdvice）
-    private var lastRagRequest: RagAdviceRequest? = null
+    private var lastRagRequestKey: RagAdviceRequest? = null
     private var lastRagAdviceAt = 0L
 
     private val _isRaining = MutableStateFlow(false)
@@ -240,7 +242,8 @@ class HomeViewModel(
             data = response,
             nearestRecord = nearest,
             displayRegion = displayRegion,
-            isFromCache = response.status == "cached"
+            // 後端在環境部連不上時改回快取，message 會寫明原因與是幾分鐘前的資料
+            cacheNotice = if (response.status == "cached") response.message else null
         )
         lastSuccessState = successState
         _uiState.value = successState
@@ -261,7 +264,7 @@ class HomeViewModel(
         val cached = lastSuccessState
         if (cached != null) {
             Log.w(TAG, "$logMessage，改用快取資料：${cause.localizedMessage}")
-            _uiState.value = cached.copy(isFromCache = true)
+            _uiState.value = cached.copy(cacheNotice = cached.cacheNotice ?: "網路連線異常，顯示先前的資料")
         } else {
             Log.e(TAG, logMessage, cause)
             _uiState.value = AqiUiState.Error("$userFacing: ${cause.localizedMessage}")
@@ -292,13 +295,19 @@ class HomeViewModel(
             userProfile = userProfile
         )
 
+        // GPS 每次定位都會飄移幾公尺，座標取到小數第 3 位（約 100 公尺）再比對，
+        // 人沒移動就視為同一個位置；送出的請求仍用原始座標
+        val requestKey = request.copy(
+            latitude = request.latitude?.let { round(it * 1000) / 1000 },
+            longitude = request.longitude?.let { round(it * 1000) / 1000 }
+        )
         val current = _ragAdviceState.value
         val isFresh = SystemClock.elapsedRealtime() - lastRagAdviceAt < RAG_ADVICE_TTL_MS
-        if (!force && request == lastRagRequest &&
+        if (!force && requestKey == lastRagRequestKey &&
             (current is RagAdviceUiState.Loading || (current is RagAdviceUiState.Success && isFresh))
         ) return
 
-        lastRagRequest = request
+        lastRagRequestKey = requestKey
         viewModelScope.launch {
             _ragAdviceState.value = RagAdviceUiState.Loading
             try {
