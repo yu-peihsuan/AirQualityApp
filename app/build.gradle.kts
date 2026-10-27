@@ -21,8 +21,8 @@ android {
         applicationId = "com.peihsuan.airquality"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 地圖顯示（Maps SDK）：Android 應用程式限制的金鑰，只進 Manifest
