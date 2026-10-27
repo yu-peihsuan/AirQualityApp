@@ -1,5 +1,6 @@
 package com.example.airquality
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -35,18 +36,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     private fun showNotification(title: String, body: String) {
-        val channelId = "air_quality_alerts"
-        val notificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "空氣品質警報",
-                NotificationManager.IMPORTANCE_HIGH
-            )
-            notificationManager.createNotificationChannel(channel)
-        }
+        val notificationManager = ensureChannel(this)
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -56,14 +46,42 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(this, channelId)
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)   // Android 7 以下沒有頻道，靠這個決定是否跳出
             .build()
 
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+    }
+
+    companion object {
+        /** 後端推播指定的頻道（fcm_sender.py 的 ANDROID_CHANNEL_ID），兩邊要一致。 */
+        const val CHANNEL_ID = "air_quality_alerts"
+
+        /**
+         * 建立「空氣品質警報」高重要度頻道。
+         *
+         * App 在背景時，推播由系統直接顯示、不經過 onMessageReceived，系統會用
+         * 推播指定（或 Manifest 預設）的頻道；頻道不存在就退回 Firebase 自建的
+         * 「其他」頻道——預設重要度、鎖定時不點亮螢幕，使用者要解鎖才看得到。
+         * 所以必須在 App 啟動時就建好，不能等到第一則前景推播才建。
+         * 重複呼叫是安全的：同 ID 的頻道已存在時系統不會變更它。
+         */
+        fun ensureChannel(context: Context): NotificationManager {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    CHANNEL_ID,
+                    "空氣品質警報",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply { lockscreenVisibility = Notification.VISIBILITY_PUBLIC }
+                manager.createNotificationChannel(channel)
+            }
+            return manager
+        }
     }
 }

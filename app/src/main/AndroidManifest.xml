@@ -26,6 +26,11 @@
             </intent-filter>
         </service>
 
+        <!-- 背景推播沒指定頻道時用這個，而不是 Firebase 自建的「其他」頻道（見 MyFirebaseMessagingService.CHANNEL_ID） -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="air_quality_alerts" />
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
