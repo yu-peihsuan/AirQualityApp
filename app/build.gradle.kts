@@ -1,8 +1,9 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // AGP 9 內建 Kotlin 支援，不再套用 org.jetbrains.kotlin.android
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
 }
@@ -49,6 +50,8 @@ android {
             // 開啟 R8：移除未使用的程式碼、混淆，並依 proguard-rules.pro
             // 把 release 版的 Log.v／Log.d 一併去掉
             isMinifyEnabled = true
+            // 移除沒用到的資源（Play Console 的 R8 最佳化建議）
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -59,9 +62,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-    }
-    kotlinOptions {
-        jvmTarget = "11"
     }
     buildFeatures {
         compose = true
@@ -92,6 +92,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
     // GPS 定位 (FusedLocationProviderClient)
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    // Play 服務（basement）間接帶進的 fragment 只有 1.1.0，Play Console 要求 1.2.1 以上；
+    // App 本身沒用 Fragment，這裡只是把版本拉高
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
     // Firebase Cloud Messaging (推播通知)
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
     implementation("com.google.firebase:firebase-messaging-ktx")
@@ -107,4 +110,10 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
+    }
 }
