@@ -20,6 +20,9 @@ class AirQualityApplication : Application() {
         AppContainer.init(this)
         AuthManager.init(this)
 
+        // 背景推播的通知頻道要先存在，見 MyFirebaseMessagingService.ensureChannel
+        MyFirebaseMessagingService.ensureChannel(this)
+
         // 先在背景取得憑證。不做這件事程式仍然正確（攔截器會在第一個需要
         // 憑證的請求上臨時註冊），但那會讓首頁的第一次查詢多等一次來回。
         thread(isDaemon = true) { AuthManager.accessToken() }
