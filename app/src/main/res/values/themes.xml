@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.AirQuality" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+        無邊框的系統列外觀（見 MainActivity）。原本由 enableEdgeToEdge() 在執行時設定，
+        改在主題裡設，避免呼叫 Android 15 已淘汰的 API。各版本覆寫在 values-v27/29/30。
+        Android 15 以上強制無邊框，這些屬性會被系統忽略。
+        Android 7.x：導覽列圖示無法變深色，給半透明深色底
+    -->
+    <style name="Theme.AirQuality" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#801B1B1B</item>
+    </style>
 </resources>

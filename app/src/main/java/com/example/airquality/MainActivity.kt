@@ -3,7 +3,7 @@ package com.example.airquality
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,7 +26,10 @@ data class NavItem(val label: String, val iconRes: Int?, val emoji: String? = nu
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // 無邊框（內容延伸到狀態列／導覽列底下）。不用 enableEdgeToEdge()：它為了相容舊版
+        // 會呼叫 Android 15 已淘汰的 setStatusBarColor／setNavigationBarColor 等，Play Console
+        // 會標記。系統列的顏色與圖示深淺改由 themes.xml（values、values-v27/29/30）設定
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         // 取得 FCM Token 並儲存，供後端發送推播使用
         AppContainer.fcmToken.refreshToken()
         setContent {
