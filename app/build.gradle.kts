@@ -78,6 +78,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    // Material3 1.4 起不再附帶圖示，AI 頁的 Icons.Outlined.* 要另外加
+    implementation(libs.androidx.compose.material.iconsCore)
 
     // ========== 新增的 API 串接與架構套件 ==========
     // Retrofit 與 Gson 轉換器 (用於打 API 並將 JSON 轉為 Kotlin 物件)
