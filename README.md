@@ -3,7 +3,8 @@
 台灣空氣品質即時監測 App 的 Android 前端，以 Kotlin + Jetpack Compose 開發，
 提供即時空品、污染熱點地圖、民眾回報與 RAG AI 個人化健康建議。
 
-後端（FastAPI）：[yu-peihsuan/AirQuality_backend](https://github.com/yu-peihsuan/AirQuality_backend)
+後端（FastAPI）：[yu-peihsuan/AirQuality_backend](https://github.com/yu-peihsuan/AirQuality_backend)<br>
+隱私權政策：(https://air-quality-privacy-policy.vercel.app/)
 
 ## 技術棧
 
