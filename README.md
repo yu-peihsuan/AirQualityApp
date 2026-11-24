@@ -4,7 +4,7 @@
 提供即時空品、污染熱點地圖、民眾回報與 RAG AI 個人化健康建議。
 
 後端（FastAPI）：[yu-peihsuan/AirQuality_backend](https://github.com/yu-peihsuan/AirQuality_backend)<br>
-隱私權政策：(https://air-quality-privacy-policy.vercel.app/)
+隱私權政策：https://air-quality-privacy-policy.vercel.app/
 
 ## 技術棧
 
