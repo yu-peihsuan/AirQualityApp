@@ -28,16 +28,6 @@
 | 熱點地圖 | `MapScreen.kt` | GIS 污染熱點、民生示警火災圖層 |
 | 設定 | `SettingsScreen.kt` | 健康檔案（年齡、氣喘、心血管等）、通知設定 |
 
-## 通知中心分類
-
-| 類型 | 顏色 | 來源 |
-|------|------|------|
-| 火災警示 | 深紅 | NCDR 民生示警平台 |
-| 民眾回報 | 橘色 | 使用者回報 |
-| 空氣品質警報 | 紅色 | 環境部 AQI（≥ 151 才顯示） |
-| 空品預報警示 | 藍色 | 環境部 AQF_P_01（僅顯示與當前狀態不同的預報） |
-| 近期新聞 | 灰色 | 爬蟲新聞（24 小時內） |
-
 ## 動態桌面圖示
 
 首頁取得 AQI 後，`AppIconManager` 依環境部六級指標啟用對應的 activity-alias，
@@ -47,7 +37,6 @@
 |------|------|
 | `AppIconManager.kt` | AQI 等級對應 activity-alias 的切換邏輯 |
 | `AndroidManifest.xml` | 7 個 activity-alias（預設 + 六等級表情） |
-| `design/icons/` | 圖示母檔與產生腳本，見 [design/icons/README.md](design/icons/README.md) |
 
 ## 專案結構
 
